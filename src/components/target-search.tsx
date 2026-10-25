@@ -5,14 +5,33 @@ import { SkillCombobox } from '@/components/skill-combobox'
 import { TargetTable } from '@/components/target-table'
 import { ValueSelect, type Option } from '@/components/value-select'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { approximateTime, parseFrame } from '@/lib/frame'
 import { searchCharms, type MeldingSkills } from '@/lib/navi'
-import { majorSkills, pointsFor, skillsFor, type Slot } from '@/lib/skills'
-import { gosekiKey, MELDING_LABEL, targetKey, targetsOf, type Goseki, type Target, type Trial } from '@/lib/snipe'
+import { charmText, majorSkills, pointsFor, skillsFor, type Slot } from '@/lib/skills'
+import {
+  gosekiKey,
+  gosekiOf,
+  MELDING_LABEL,
+  targetKey,
+  targetsOf,
+  type Goseki,
+  type Target,
+  type Trial,
+} from '@/lib/snipe'
 import type { Compare, Kind, Melding, SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -61,18 +80,21 @@ export function TargetSearch({
   trials: Trial[]
 }) {
   const [view, setView] = useState<'search' | 'favorites'>('search')
+  /** 外すか確かめている、お気に入りの護石 */
+  const [removing, setRemoving] = useState<Goseki | null>(null)
 
-  // ☆ を押したら、その護石 (どのタイミングの行でも) を入れる・外す (新しく入れたものは先頭に)。
-  // 続けて押しても取りこぼさないよう、直前の値から作る
+  // ☆ を押したら、その護石 (どのタイミングの行でも) を入れる (新しく入れたものは先頭に)。
+  // 入っていれば、押し間違えで消えないよう、外す前に確かめる
   const toggleFavorite = (t: Target) => {
     const key = gosekiKey(t)
-    const { melding, charm, kind, position, aims } = t
-    onFavorites((prev) =>
-      prev.some((f) => gosekiKey(f) === key)
-        ? prev.filter((f) => gosekiKey(f) !== key)
-        : [{ melding, charm, kind, position, aims }, ...prev],
-    )
+    if (favorites.some((f) => gosekiKey(f) === key)) {
+      setRemoving(gosekiOf(t))
+      return
+    }
+    // 続けて押しても取りこぼさないよう、直前の値から作る
+    onFavorites((prev) => (prev.some((f) => gosekiKey(f) === key) ? prev : [gosekiOf(t), ...prev]))
   }
+  const remove = (g: Goseki) => onFavorites((prev) => prev.filter((f) => gosekiKey(f) !== gosekiKey(g)))
 
   return (
     <div className="space-y-4">
@@ -151,6 +173,27 @@ export function TargetSearch({
           </div>
         )}
       </div>
+      <AlertDialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>お気に入りから外しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removing && `${charmText(skills, removing.charm)} (${MELDING_LABEL[removing.melding]})`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>やめる</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (removing) remove(removing)
+                setRemoving(null)
+              }}
+            >
+              外す
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { MinusIcon, PlusIcon } from 'lucide-react'
 
 import { IntegerInput } from '@/components/integer-input'
@@ -7,7 +8,7 @@ import { PATTERNS } from '@/lib/pattern'
 import type { TimingSettings } from '@/lib/snipe'
 
 /** 入力欄の横に置く見出し。どれも同じ幅にして、欄の頭をそろえる (いちばん長い「待機時間補正」に合わせる) */
-export const FIELD_LABEL = 'w-24 shrink-0 text-sm font-normal text-muted-foreground'
+export const FIELD_LABEL = 'w-22 shrink-0 text-sm font-normal text-muted-foreground'
 
 /**
  * 目押しの設定: 補正・音・合図のパターン (スナイプと練習と設定で共通)。変えた項目だけを渡す。
@@ -18,6 +19,8 @@ export function TimingSettingsFields({
   value,
   onChange,
   waitCorrection = true,
+  waitCorrectionNote,
+  soundCorrectionAction,
   disabled,
 }: {
   /** 欄の id の頭 (同じ欄が画面に何組かあるので) */
@@ -25,6 +28,10 @@ export function TimingSettingsFields({
   value: TimingSettings
   onChange: (v: Partial<TimingSettings>) => void
   waitCorrection?: boolean
+  /** 待機時間補正のすぐ下に出すもの (補正を決める材料) */
+  waitCorrectionNote?: ReactNode
+  /** 音ずれ補正の欄の右に置くもの */
+  soundCorrectionAction?: ReactNode
   disabled?: boolean
 }) {
   return (
@@ -38,13 +45,16 @@ export function TimingSettingsFields({
           disabled={disabled}
         />
       )}
+      {waitCorrection && waitCorrectionNote}
       <CorrectionField
         id={`${id}-sound-correction`}
         label="音ずれ補正"
         value={value.soundCorrection}
         onChange={(soundCorrection) => onChange({ soundCorrection })}
         disabled={disabled}
-      />
+      >
+        {soundCorrectionAction}
+      </CorrectionField>
       <div className="flex items-center gap-2">
         <Label htmlFor={`${id}-beep`} className={FIELD_LABEL}>
           合図の音
@@ -85,12 +95,15 @@ function CorrectionField({
   value,
   onChange,
   disabled,
+  children,
 }: {
   id: string
   label: string
   value: number
   onChange: (v: number) => void
   disabled?: boolean
+  /** 欄の右に置くもの */
+  children?: ReactNode
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -109,7 +122,7 @@ function CorrectionField({
         </Button>
         <IntegerInput
           id={id}
-          className="w-16 text-center font-mono"
+          className="w-12 text-center font-mono"
           value={value}
           onChange={onChange}
           disabled={disabled}
@@ -125,6 +138,7 @@ function CorrectionField({
         </Button>
       </div>
       <span className="text-sm text-muted-foreground">F</span>
+      {children}
     </div>
   )
 }

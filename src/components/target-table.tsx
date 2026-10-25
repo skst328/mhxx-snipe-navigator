@@ -1,5 +1,6 @@
-import { CrownIcon, CrosshairIcon, StarIcon } from 'lucide-react'
+import { CrosshairIcon, StarIcon } from 'lucide-react'
 
+import { OwnedCrownIcon } from '@/components/owned-crown-icon'
 import { Button } from '@/components/ui/button'
 import { frameToShortTime, showFrame } from '@/lib/frame'
 import { skillName } from '@/lib/skills'
@@ -8,19 +9,8 @@ import type { Charm, SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 /** 護石の中身を、スキル1・スキル2・スロットの列に分けて出す (スキル名とポイントは詰める)。
- * どれも狙いを決める条件なので、3 つとも同じ強さで出す。span 行ぶん縦に結合する。
- * 所持済みなら、スロットの後ろに王冠を添える */
-function CharmCells({
-  skills,
-  charm,
-  span,
-  owned,
-}: {
-  skills: SkillInfo[]
-  charm: Charm
-  span: number
-  owned: boolean
-}) {
+ * どれも狙いを決める条件なので、3 つとも同じ強さで出す。span 行ぶん縦に結合する */
+function CharmCells({ skills, charm, span }: { skills: SkillInfo[]; charm: Charm; span: number }) {
   return (
     <>
       <td rowSpan={span} className={FIRST}>
@@ -31,10 +21,7 @@ function CharmCells({
         {charm.skill2 !== null && `${skillName(skills, charm.skill2)}${charm.pts2}`}
       </td>
       <td rowSpan={span} className={COLUMN}>
-        <span className="inline-flex items-center gap-1">
-          S{charm.slots}
-          {owned && <CrownIcon className="size-3.5 text-warning" aria-label="所持済み" />}
-        </span>
+        S{charm.slots}
       </td>
     </>
   )
@@ -52,7 +39,7 @@ const FIRST = 'w-px pr-1 pl-1 sm:pr-3 sm:pl-2'
  * (タイミングごと)。同じ護石の行 (錬金するフレームと鑑定順だけが違うもの) を隣どうしに並べて渡すと、
  * 護石ごとの列を縦に結合して、護石 1 つにタイミングが何行か並ぶ形にする。
  * extra があれば、鑑定順の後ろに列を足す (お気に入りの試行回数など)。
- * ☆ は護石ごと (その護石のタイミング全部が入る)。owned は所持済みの護石のキー
+ * ☆ は護石ごと (その護石のタイミング全部が入る)。owned は所持済みの護石のキー (☆ の代わりに王冠を出す)
  */
 export function TargetTable({
   skills,
@@ -124,7 +111,8 @@ export function TargetTable({
                 {first && (
                   <>
                     <td rowSpan={span} className="pl-1">
-                      {/* 狭い幅では少し小さくする (表が横にはみ出さないように) */}
+                      {/* 狭い幅では少し小さくする (表が横にはみ出さないように)。所持済みの護石は ☆ の代わりに王冠を出す
+                          (形で所持済み、塗りでお気に入りが分かる。押したときはどちらもお気に入りの出し入れ) */}
                       <Button
                         variant="ghost"
                         size="icon-sm"
@@ -133,10 +121,19 @@ export function TargetTable({
                         aria-label={favorite ? 'お気に入りから外す' : 'お気に入りに入れる'}
                         aria-pressed={favorite}
                       >
-                        <StarIcon className={cn(favorite ? 'fill-warning text-warning' : 'text-muted-foreground/50')} />
+                        {owned.includes(gosekiKey(r)) ? (
+                          <OwnedCrownIcon
+                            className={cn(favorite ? 'fill-warning text-warning' : 'text-muted-foreground/50')}
+                            jewel={favorite}
+                          />
+                        ) : (
+                          <StarIcon
+                            className={cn(favorite ? 'fill-warning text-warning' : 'text-muted-foreground/50')}
+                          />
+                        )}
                       </Button>
                     </td>
-                    <CharmCells skills={skills} charm={r.charm} span={span} owned={owned.includes(gosekiKey(r))} />
+                    <CharmCells skills={skills} charm={r.charm} span={span} />
                   </>
                 )}
                 {/* 数字の幅は表全体の tabular-nums で揃うので、フォントは変えない (表の中で強調の差を付けるのは時間だけ) */}

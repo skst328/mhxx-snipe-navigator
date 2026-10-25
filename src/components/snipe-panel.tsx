@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CheckIcon, PlayIcon, RotateCcwIcon, SquareIcon, TimerIcon } from 'lucide-react'
+import { CheckIcon, PartyPopperIcon, PlayIcon, RotateCcwIcon, SquareIcon, TimerIcon } from 'lucide-react'
 
 import { Countdown } from '@/components/countdown'
 import { FIELD_LABEL, TimingSettingsFields } from '@/components/timing-settings'
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { frameToShortTime, parseFrame, showDrift, showFrame } from '@/lib/frame'
 import { meldOutcomes } from '@/lib/navi'
 import { charmText } from '@/lib/skills'
-import type { Target, TimingSettings, Trial } from '@/lib/snipe'
+import { drift, gosekiKey, type Target, type TimingSettings, type Trial } from '@/lib/snipe'
 import { scheduleBeeps } from '@/lib/sound'
 import { FPS, FRAME_MS, parseInteger, splitFrames } from '@/lib/timing'
 import type { Outcome, SkillInfo } from '@/lib/types'
@@ -39,12 +39,15 @@ export function SnipePanel({
   target,
   settings,
   onSettings,
+  trials,
   onRecord,
 }: {
   skills: SkillInfo[]
   target: Target
   settings: TimingSettings
   onSettings: (s: Partial<TimingSettings>) => void
+  /** 新しい順 */
+  trials: Trial[]
   onRecord: (t: Trial) => void
 }) {
   /** 調合を始めた瞬間 (performance.now() の時刻) */
@@ -227,7 +230,15 @@ export function SnipePanel({
                 />
                 <span className="text-sm text-muted-foreground">F</span>
               </div>
-              <TimingSettingsFields id="snipe" value={settings} onChange={onSettings} disabled={zero !== null} />
+              <TimingSettingsFields
+                id="snipe"
+                value={settings}
+                onChange={onSettings}
+                disabled={zero !== null}
+                waitCorrectionNote={
+                  <RecentCorrections trials={trials.filter((t) => gosekiKey(t.target) === gosekiKey(target))} />
+                }
+              />
             </div>
             {/* スタートを押すまでは待機時間のまま止めておく */}
             <Countdown
@@ -420,7 +431,40 @@ function Review({
           {saved && <CheckIcon />}
           {saved ? '記録しました' : '記録に残す'}
         </Button>
+        {saved && drift === 0 && (
+          <p className="flex w-fit items-center gap-1.5 rounded-full border border-success/50 px-3 py-1 text-sm text-success">
+            <PartyPopperIcon className="size-4" />
+            おめでとう！記録しました
+          </p>
+        )}
       </CardContent>
     </Card>
+  )
+}
+
+/** 直近の試行を何回分出すか */
+const RECENT = 3
+
+/**
+ * この護石の直近の試行の、待機時間補正と結果のズレの組 (新しい順)。次の補正を決める材料にする
+ * (どう直すかは使う人が決めるので、平均や当たる補正のような値は出さない)
+ */
+function RecentCorrections({ trials }: { trials: Trial[] }) {
+  if (trials.length === 0) return null
+  return (
+    <div className="flex gap-2 text-xs text-muted-foreground">
+      <span className={cn(FIELD_LABEL, 'text-xs')}>直近</span>
+      <ol className="space-y-0.5 tabular-nums">
+        {trials.slice(0, RECENT).map((t) => {
+          const d = drift(t)
+          return (
+            <li key={t.at}>
+              補正 {showDrift(t.waitCorrection)} → ズレ{' '}
+              <span className={cn(d === 0 ? 'text-success' : 'text-foreground')}>{showDrift(d)}</span>
+            </li>
+          )
+        })}
+      </ol>
+    </div>
   )
 }

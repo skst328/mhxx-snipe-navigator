@@ -86,5 +86,14 @@ export const MELDING_LABEL: Record<Melding, string> = {
   halcyon: '天運',
 }
 
+/** 狙いから、護石の部分だけを取り出す */
+export const gosekiOf = ({ melding, charm, kind, position, aims }: Target): Goseki => ({
+  melding,
+  charm,
+  kind,
+  position,
+  aims,
+})
+
 /** 護石の各タイミングを、狙いの一覧にする */
 export const targetsOf = (g: Goseki): Target[] => g.aims.map((a) => ({ ...g, ...a }))

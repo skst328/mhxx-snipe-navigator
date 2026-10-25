@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { CrownIcon, Trash2Icon } from 'lucide-react'
 
+import { OwnedCrownIcon } from '@/components/owned-crown-icon'
 import { ValueSelect } from '@/components/value-select'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { frameToShortTime, showDrift, showFrame } from '@/lib/frame'
 import { charmText } from '@/lib/skills'
-import { drift, gosekiKey, MELDING_LABEL, type Target, type Trial } from '@/lib/snipe'
+import { drift, gosekiKey, gosekiOf, MELDING_LABEL, type Goseki, type Target, type Trial } from '@/lib/snipe'
 import type { SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -27,7 +28,7 @@ export function RecordsPanel({
   /** 所持済みの護石のキー */
   owned: string[]
   /** 護石の所持済みを付ける・外す */
-  onOwned: (key: string) => void
+  onOwned: (g: Goseki) => void
   onClear: () => void
 }) {
   const [selected, setSelected] = useState<string | null>(null)
@@ -72,10 +73,10 @@ export function RecordsPanel({
             <Button
               variant={isOwned ? 'default' : 'outline'}
               className="shrink-0"
-              onClick={() => onOwned(key)}
+              onClick={() => onOwned(gosekiOf(shown[0].target))}
               aria-pressed={isOwned}
             >
-              <CrownIcon />
+              <OwnedCrownIcon jewel={isOwned} />
               {isOwned ? '所持済み' : '所持済みにする'}
             </Button>
           </div>

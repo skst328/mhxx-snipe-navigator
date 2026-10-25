@@ -211,6 +211,7 @@ export default function App() {
                   target={target}
                   settings={settings}
                   onSettings={changeSettings}
+                  trials={trials}
                   onRecord={(t) => setTrials((prev) => [t, ...prev])}
                 />
               ) : (
@@ -231,14 +232,26 @@ export default function App() {
                 trials={trials}
                 target={target}
                 owned={owned}
-                onOwned={(key) =>
-                  setOwned((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
-                }
+                onOwned={(g) => {
+                  const key = gosekiKey(g)
+                  if (owned.includes(key)) {
+                    setOwned((prev) => prev.filter((k) => k !== key))
+                    return
+                  }
+                  setOwned((prev) => [...prev, key])
+                  // 所持済みにしたら、お気に入りにも入れる (お気に入りの一覧から見えるように)
+                  setFavorites((prev) => (prev.some((f) => gosekiKey(f) === key) ? prev : [g, ...prev]))
+                }}
                 onClear={() => setTrials([])}
               />
             </div>
             <div role="tabpanel" hidden={tab !== 'practice'}>
-              <PracticePanel settings={settings} onSettings={changeSettings} />
+              <PracticePanel
+                settings={settings}
+                onSettings={changeSettings}
+                defaultSoundCorrection={defaults.soundCorrection}
+                onDefaultSoundCorrection={(soundCorrection) => setDefaults((prev) => ({ ...prev, soundCorrection }))}
+              />
             </div>
           </>
         )}
