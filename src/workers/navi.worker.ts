@@ -63,7 +63,8 @@ async function handle(request: WorkerRequest): Promise<void> {
           post({ id, type: 'cancelled' })
           return
         }
-        found.push(...search(melding, charms, kinds, compare, a, Math.min(a + CHUNK, end)))
+        // 足りない分だけ受け取る (結果は乱数の位置の順なので、LIMIT 件を超えた分は要らない)
+        found.push(...search(melding, charms, kinds, compare, a, Math.min(a + CHUNK, end), LIMIT - found.length))
         if (found.length >= LIMIT) {
           post({ id, type: 'search', found: found.slice(0, LIMIT), truncated: true })
           return

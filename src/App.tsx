@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertCircleIcon, ChartColumnIcon, CrosshairIcon, DumbbellIcon, SearchIcon, XIcon } from 'lucide-react'
+import {
+  AlertCircleIcon,
+  ChartColumnIcon,
+  CrosshairIcon,
+  DumbbellIcon,
+  SearchIcon,
+  SettingsIcon,
+  TimerIcon,
+  XIcon,
+} from 'lucide-react'
 
+import { MashPanel } from '@/components/mash-panel'
 import { PracticePanel } from '@/components/practice-panel'
 import { RecordsPanel } from '@/components/records-panel'
+import { SettingsDialog } from '@/components/settings-dialog'
 import { SnipePanel } from '@/components/snipe-panel'
 import { TargetSearch } from '@/components/target-search'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -18,17 +29,18 @@ import {
   MELDING_LABEL,
   targetKey,
   type Goseki,
+  type Settings,
   type Target,
-  type TimingSettings,
   type Trial,
 } from '@/lib/snipe'
 import { useStored } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 
-type Tab = 'target' | 'snipe' | 'records' | 'practice'
+type Tab = 'target' | 'mash' | 'snipe' | 'records' | 'practice'
 
 const TABS: { value: Tab; label: string; icon: typeof SearchIcon }[] = [
   { value: 'target', label: '検索', icon: SearchIcon },
+  { value: 'mash', label: '連打', icon: TimerIcon },
   { value: 'snipe', label: 'スナイプ', icon: CrosshairIcon },
   { value: 'records', label: '記録', icon: ChartColumnIcon },
   { value: 'practice', label: '練習', icon: DumbbellIcon },
@@ -38,13 +50,27 @@ export default function App() {
   const [tab, setTab] = useStored<Tab>('tab', 'target')
   const [target, setTarget] = useStored<Target | null>('target-goseki', null)
   const [trials, setTrials] = useStored<Trial[]>('trials', [])
-  const [settings, setSettings] = useStored<TimingSettings>('timing', DEFAULT_SETTINGS)
+  /** 設定 (各タブの初期値) */
+  const [defaults, setDefaults] = useStored<Settings>('settings', DEFAULT_SETTINGS)
+  /** 狙いがある間にタブで変えた値と、その狙いの護石のキー (狙いを変えたら初期値に戻る) */
+  const [changed, setChanged] = useStored<{ key: string; values: Partial<Settings> }>('changed-settings', {
+    key: '',
+    values: {},
+  })
   const [favorites, setFavorites] = useStored<Goseki[]>('favorite-goseki-by-melding', [])
+  /** 所持済みの護石のキー */
+  const [owned, setOwned] = useStored<string[]>('owned-goseki', [])
   /** 錬金のやり方ごとの、出るスキルとポイントの範囲 (wasm から) */
   const [meldingSkills, setMeldingSkills] = useState<MeldingSkills | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   /** 名前を出すだけなら、どちらの錬金のスキルも引けるように合わせておく */
   const skills = useMemo(() => meldingSkills && [...meldingSkills.juju, ...meldingSkills.halcyon], [meldingSkills])
+  // 同じ護石のタイミングを切り替えても、変えた値は引き継ぐ
+  const scope = target ? gosekiKey(target) : ''
+  const settings: Settings = { ...defaults, ...(changed.key === scope ? changed.values : {}) }
+  const changeSettings = (s: Partial<Settings>) =>
+    setChanged((prev) => ({ key: scope, values: { ...(prev.key === scope ? prev.values : {}), ...s } }))
 
   useEffect(() => {
     loadSkills().then(setMeldingSkills, (e: Error) => setError(e.message))
@@ -81,7 +107,8 @@ export default function App() {
               >
                 <XIcon />
               </Button>
-              {/* この護石に届く錬金のタイミングを全部並べ、選んだものだけ塗る。押すとそのタイミングに切り替わる */}
+              {/* この護石に届く錬金のタイミングを全部並べ、選んだものだけ塗る。押すとそのタイミングに切り替わる。
+                  広い幅ではボタンを一回り大きく */}
               <div className="flex w-full flex-wrap gap-1.5" role="radiogroup" aria-label="錬金のタイミング">
                 {target.aims.map((a) => {
                   const selected = targetKey(a) === targetKey(target)
@@ -92,7 +119,7 @@ export default function App() {
                       variant={selected ? 'default' : 'outline'}
                       role="radio"
                       aria-checked={selected}
-                      className="tabular-nums"
+                      className="tabular-nums sm:h-8 sm:px-3 sm:text-sm"
                       onClick={() => setTarget({ ...target, ...a })}
                     >
                       {showFrame(a.frame)}F {a.index}番目
@@ -108,13 +135,26 @@ export default function App() {
         <header className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <h1 className="flex flex-wrap items-baseline gap-x-2">
-              <span className="text-2xl font-bold tracking-tight sm:text-3xl">MHXX 護石スナイプナビ</span>
+              {/* 狭い幅では、右の歯車とテーマのボタンと並んでも途中で折り返さない大きさに */}
+              <span className="text-xl font-bold tracking-tight sm:text-3xl">MHXX 護石スナイプナビ</span>
               <span className="text-base font-normal whitespace-nowrap text-muted-foreground tabular-nums sm:text-lg">
                 v{__APP_VERSION__}
               </span>
             </h1>
           </div>
-          <ThemeToggle />
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-9 sm:size-10"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="設定"
+              title="設定"
+            >
+              <SettingsIcon className="size-5" />
+            </Button>
+            <ThemeToggle />
+          </div>
         </header>
 
         {error && (
@@ -125,7 +165,7 @@ export default function App() {
           </Alert>
         )}
 
-        <nav role="tablist" className="grid grid-cols-4 gap-1 rounded-lg bg-muted p-1">
+        <nav role="tablist" className="grid grid-cols-5 gap-1 rounded-lg bg-muted p-1">
           {TABS.map(({ value, label, icon: Icon }) => (
             <button
               key={value}
@@ -155,8 +195,12 @@ export default function App() {
                 onTarget={setTarget}
                 favorites={favorites}
                 onFavorites={setFavorites}
+                owned={owned}
                 trials={trials}
               />
+            </div>
+            <div role="tabpanel" hidden={tab !== 'mash'}>
+              <MashPanel target={target} settings={settings} onSettings={changeSettings} />
             </div>
             <div role="tabpanel" hidden={tab !== 'snipe'}>
               {target ? (
@@ -166,7 +210,7 @@ export default function App() {
                   skills={skills}
                   target={target}
                   settings={settings}
-                  onSettings={setSettings}
+                  onSettings={changeSettings}
                   onRecord={(t) => setTrials((prev) => [t, ...prev])}
                 />
               ) : (
@@ -182,14 +226,29 @@ export default function App() {
               )}
             </div>
             <div role="tabpanel" hidden={tab !== 'records'}>
-              <RecordsPanel skills={skills} trials={trials} onClear={() => setTrials([])} />
+              <RecordsPanel
+                skills={skills}
+                trials={trials}
+                target={target}
+                owned={owned}
+                onOwned={(key) =>
+                  setOwned((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
+                }
+                onClear={() => setTrials([])}
+              />
             </div>
             <div role="tabpanel" hidden={tab !== 'practice'}>
-              <PracticePanel settings={settings} onSettings={setSettings} />
+              <PracticePanel settings={settings} onSettings={changeSettings} />
             </div>
           </>
         )}
       </main>
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        value={defaults}
+        onChange={(s) => setDefaults((prev) => ({ ...prev, ...s }))}
+      />
     </>
   )
 }

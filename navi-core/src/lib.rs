@@ -76,7 +76,8 @@ pub fn skill_info(
 /// charms と kinds の組のうち出ないものは飛ばし、どれも出なければエラー (第 1 スキルを問わないときに、
 /// 呼ぶ側が第 1 スキルごとの条件を並べて渡す)。エラーの文は画面にそのまま出せる日本語で、charms が 1 つなら
 /// 種類ごとの理由も改行で区切って付ける (候補が多いと長くなりすぎるので)。
-/// 範囲で区切って呼べるので、進み具合の表示は呼ぶ側が範囲を刻む
+/// 範囲で区切って呼べるので、進み具合の表示は呼ぶ側が範囲を刻む。
+/// 返すのは位置の小さいほうから limit 件まで (条件がゆるいと何十万件も当たり、JS に渡すのが重いので)
 #[wasm_bindgen(unchecked_return_type = "Found[]")]
 pub fn search(
     #[wasm_bindgen(unchecked_param_type = "Melding")] melding: JsValue,
@@ -85,6 +86,7 @@ pub fn search(
     #[wasm_bindgen(unchecked_param_type = "Compare")] compare: JsValue,
     start: f64,
     end: f64,
+    limit: u32,
 ) -> Result<JsValue, JsError> {
     let melding: rand::Melding = serde_wasm_bindgen::from_value::<Melding>(melding)?.into();
     let charms: Vec<Charm> = serde_wasm_bindgen::from_value(charms)?;
@@ -123,6 +125,7 @@ pub fn search(
     }
     let found: Vec<Found> = rand::search_many(&queries, compare.into(), frame(start)?..frame(end)?)
         .iter()
+        .take(limit as usize)
         .map(Found::from)
         .collect();
     to_js(&found)

@@ -1,41 +1,44 @@
+import { IntegerInput } from '@/components/integer-input'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PATTERNS } from '@/lib/pattern'
 import type { TimingSettings } from '@/lib/snipe'
-import { parseInteger } from '@/lib/timing'
 
-/** 目押しの設定: 補正・音・合図のパターン (スナイプと練習で共通) */
+/** 入力欄の横に置く見出し。どれも同じ幅にして、欄の頭をそろえる (いちばん長い「待機時間」に合わせる) */
+export const FIELD_LABEL = 'w-16 shrink-0 text-sm font-normal text-muted-foreground'
+
+/** 目押しの設定: 補正・音・合図のパターン (スナイプと練習と設定で共通)。変えた項目だけを渡す */
 export function TimingSettingsFields({
+  id,
   value,
   onChange,
   disabled,
 }: {
+  /** 欄の id の頭 (同じ欄が画面に何組かあるので) */
+  id: string
   value: TimingSettings
-  onChange: (v: TimingSettings) => void
+  onChange: (v: Partial<TimingSettings>) => void
   disabled?: boolean
 }) {
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-4">
-        <NumberField
-          id="correction"
-          label="補正"
-          unit="F"
-          value={value.correction}
-          onChange={(correction) => onChange({ ...value, correction })}
-          disabled={disabled}
-        />
-        <NumberField
-          id="beep"
-          label="音"
-          unit="秒前から"
-          value={value.beepFrom}
-          min={0}
-          onChange={(beepFrom) => onChange({ ...value, beepFrom })}
-          disabled={disabled}
-        />
-      </div>
+      <NumberField
+        id={`${id}-correction`}
+        label="補正"
+        unit="F"
+        value={value.correction}
+        onChange={(correction) => onChange({ correction })}
+        disabled={disabled}
+      />
+      <NumberField
+        id={`${id}-beep`}
+        label="音"
+        unit="秒前から"
+        value={value.beepFrom}
+        min={0}
+        onChange={(beepFrom) => onChange({ beepFrom })}
+        disabled={disabled}
+      />
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="目押しのパターン">
         {PATTERNS.map((p) => (
           <Button
@@ -44,7 +47,7 @@ export function TimingSettingsFields({
             size="sm"
             role="radio"
             aria-checked={value.pattern === p.value}
-            onClick={() => onChange({ ...value, pattern: p.value })}
+            onClick={() => onChange({ pattern: p.value })}
             disabled={disabled}
           >
             {p.label}
@@ -55,7 +58,7 @@ export function TimingSettingsFields({
   )
 }
 
-/** 整数の入力欄。読めない値のあいだは、前の値のままにする */
+/** 見出しと単位を横に置いた整数の欄 */
 function NumberField({
   id,
   label,
@@ -75,19 +78,16 @@ function NumberField({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <Label htmlFor={id} className="text-sm font-normal text-muted-foreground">
+      <Label htmlFor={id} className={FIELD_LABEL}>
         {label}
       </Label>
-      <Input
+      <IntegerInput
         id={id}
-        inputMode="numeric"
         className="w-20 font-mono"
-        defaultValue={String(value)}
+        value={value}
+        min={min}
+        onChange={onChange}
         disabled={disabled}
-        onChange={(e) => {
-          const v = parseInteger(e.target.value)
-          if (v !== null && (min === undefined || v >= min)) onChange(v)
-        }}
       />
       <span className="text-sm text-muted-foreground">{unit}</span>
     </div>

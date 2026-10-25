@@ -1,4 +1,4 @@
-import { CrosshairIcon, StarIcon } from 'lucide-react'
+import { CrownIcon, CrosshairIcon, StarIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { frameToShortTime, showFrame } from '@/lib/frame'
@@ -8,8 +8,19 @@ import type { Charm, SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 /** 護石の中身を、スキル1・スキル2・スロットの列に分けて出す (スキル名とポイントは詰める)。
- * どれも狙いを決める条件なので、3 つとも同じ強さで出す。span 行ぶん縦に結合する */
-function CharmCells({ skills, charm, span }: { skills: SkillInfo[]; charm: Charm; span: number }) {
+ * どれも狙いを決める条件なので、3 つとも同じ強さで出す。span 行ぶん縦に結合する。
+ * 所持済みなら、スロットの後ろに王冠を添える */
+function CharmCells({
+  skills,
+  charm,
+  span,
+  owned,
+}: {
+  skills: SkillInfo[]
+  charm: Charm
+  span: number
+  owned: boolean
+}) {
   return (
     <>
       <td rowSpan={span} className={FIRST}>
@@ -20,7 +31,10 @@ function CharmCells({ skills, charm, span }: { skills: SkillInfo[]; charm: Charm
         {charm.skill2 !== null && `${skillName(skills, charm.skill2)}${charm.pts2}`}
       </td>
       <td rowSpan={span} className={COLUMN}>
-        S{charm.slots}
+        <span className="inline-flex items-center gap-1">
+          S{charm.slots}
+          {owned && <CrownIcon className="size-3.5 text-warning" aria-label="所持済み" />}
+        </span>
       </td>
     </>
   )
@@ -38,7 +52,7 @@ const FIRST = 'w-px pr-1 pl-1 sm:pr-3 sm:pl-2'
  * (タイミングごと)。同じ護石の行 (錬金するフレームと鑑定順だけが違うもの) を隣どうしに並べて渡すと、
  * 護石ごとの列を縦に結合して、護石 1 つにタイミングが何行か並ぶ形にする。
  * extra があれば、鑑定順の後ろに列を足す (お気に入りの試行回数など)。
- * ☆ は護石ごと (その護石のタイミング全部が入る)
+ * ☆ は護石ごと (その護石のタイミング全部が入る)。owned は所持済みの護石のキー
  */
 export function TargetTable({
   skills,
@@ -47,7 +61,9 @@ export function TargetTable({
   favorites,
   onTarget,
   onFavorite,
+  owned,
   extra,
+  className,
 }: {
   skills: SkillInfo[]
   rows: Target[]
@@ -55,12 +71,15 @@ export function TargetTable({
   favorites: Goseki[]
   onTarget: (t: Target) => void
   onFavorite: (t: Target) => void
+  owned: string[]
   extra?: { label: string; cell: (t: Target) => string }
+  /** 表の枠に足すクラス */
+  className?: string
 }) {
   const favoriteKeys = new Set(favorites.map(gosekiKey))
   const targetId = target && targetKey(target)
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div className={cn('overflow-x-auto rounded-lg border', className)}>
       <table className="w-full text-sm whitespace-nowrap tabular-nums [&_td]:py-2 [&_th]:pt-2 [&_th]:pb-1.5 [&_th]:text-xs [&_th]:font-normal [&_th]:text-muted-foreground">
         <thead className="border-b">
           <tr>
@@ -117,7 +136,7 @@ export function TargetTable({
                         <StarIcon className={cn(favorite ? 'fill-warning text-warning' : 'text-muted-foreground/50')} />
                       </Button>
                     </td>
-                    <CharmCells skills={skills} charm={r.charm} span={span} />
+                    <CharmCells skills={skills} charm={r.charm} span={span} owned={owned.includes(gosekiKey(r))} />
                   </>
                 )}
                 {/* 数字の幅は表全体の tabular-nums で揃うので、フォントは変えない (表の中で強調の差を付けるのは時間だけ) */}

@@ -24,13 +24,14 @@ export function ThemeToggle() {
   const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length]
   return (
     <Button
-      variant="ghost"
-      size="sm"
+      variant="outline"
+      size="icon"
+      className="size-9 sm:size-10"
       aria-label={`表示テーマ: ${LABEL[theme]}。押すと${LABEL[next]}になります`}
       title={`表示テーマ: ${LABEL[theme]}`}
       onClick={() => setTheme(next)}
     >
-      <Icon />
+      <Icon className="size-5" />
     </Button>
   )
 }

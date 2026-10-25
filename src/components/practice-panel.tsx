@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { PlayIcon, SquareIcon, Trash2Icon } from 'lucide-react'
 
 import { Countdown } from '@/components/countdown'
-import { TimingSettingsFields } from '@/components/timing-settings'
+import { FIELD_LABEL, TimingSettingsFields } from '@/components/timing-settings'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,7 @@ export function PracticePanel({
   onSettings,
 }: {
   settings: TimingSettings
-  onSettings: (s: TimingSettings) => void
+  onSettings: (s: Partial<TimingSettings>) => void
 }) {
   const [secondsText, setSecondsText] = useState('5')
   const [framesText, setFramesText] = useState('0')
@@ -81,26 +81,29 @@ export function PracticePanel({
     <div className="space-y-6">
       <Card>
         <CardContent className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <Label className="text-sm font-normal text-muted-foreground">待機時間</Label>
-            <Input
-              inputMode="numeric"
-              className="w-20 font-mono"
-              value={secondsText}
-              onChange={(e) => setSecondsText(e.target.value)}
-              disabled={target !== null}
-            />
-            <span className="text-sm text-muted-foreground">秒</span>
-            <Input
-              inputMode="numeric"
-              className="w-20 font-mono"
-              value={framesText}
-              onChange={(e) => setFramesText(e.target.value)}
-              disabled={target !== null}
-            />
-            <span className="text-sm text-muted-foreground">F</span>
+          {/* 待機時間と目押しの設定は、欄の間を詰めてひとまとまりにする */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Label className={FIELD_LABEL}>待機時間</Label>
+              <Input
+                inputMode="numeric"
+                className="w-20 font-mono"
+                value={secondsText}
+                onChange={(e) => setSecondsText(e.target.value)}
+                disabled={target !== null}
+              />
+              <span className="text-sm text-muted-foreground">秒</span>
+              <Input
+                inputMode="numeric"
+                className="w-20 font-mono"
+                value={framesText}
+                onChange={(e) => setFramesText(e.target.value)}
+                disabled={target !== null}
+              />
+              <span className="text-sm text-muted-foreground">F</span>
+            </div>
+            <TimingSettingsFields id="practice" value={settings} onChange={onSettings} disabled={target !== null} />
           </div>
-          <TimingSettingsFields value={settings} onChange={onSettings} disabled={target !== null} />
 
           <Countdown target={target} idleFrames={waitFrames} pattern={settings.pattern} />
 
@@ -131,8 +134,7 @@ export function PracticePanel({
           <CardHeader>
             <CardTitle>練習の記録</CardTitle>
             <CardDescription>
-              {presses.length} 回
-              {mean !== null && `・平均 ${formatOffset(mean)}`}
+              {presses.length} 回{mean !== null && `・平均 ${formatOffset(mean)}`}
               {spread !== null && `・ばらつき ${spread.toFixed(1)}F`}
             </CardDescription>
           </CardHeader>

@@ -32,6 +32,10 @@ export interface Trial {
   correction: number
   /** 実際に錬金したフレーム */
   actual: number
+  /** 調合タイマーで出した現在フレーム (調合タイマーを使っていなければ無い) */
+  current?: number
+  /** カウントダウンに使った待機時間 (F。カウントダウンを使っていなければ無い) */
+  wait?: number
 }
 
 /** 目押しの設定 (スナイプと練習で共通) */
@@ -43,7 +47,26 @@ export interface TimingSettings {
   beepFrom: number
 }
 
-export const DEFAULT_SETTINGS: TimingSettings = { pattern: 'dot', correction: 0, beepFrom: 5 }
+/** 連打の設定 */
+export interface MashSettings {
+  bpm: number
+  /** 1 回で乱数が進む量 (F) */
+  advance: number
+  /** ゲームを起動してからコンティニューするまでに進むフレーム (連打を始める前の分) */
+  offset: number
+}
+
+/** 設定: 各タブの初期値 */
+export type Settings = TimingSettings & MashSettings
+
+export const DEFAULT_SETTINGS: Settings = {
+  pattern: 'dot',
+  correction: 0,
+  beepFrom: 5,
+  bpm: 60,
+  advance: 700,
+  offset: 0,
+}
 
 export const drift = (t: Trial) => t.actual - t.target.frame
 

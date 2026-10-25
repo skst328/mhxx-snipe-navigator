@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { approximateTime, parseFrame } from '@/lib/frame'
 import { searchCharms, type MeldingSkills } from '@/lib/navi'
-import { pointsFor, skillsFor, type Slot } from '@/lib/skills'
+import { majorSkills, pointsFor, skillsFor, type Slot } from '@/lib/skills'
 import { gosekiKey, MELDING_LABEL, targetKey, targetsOf, type Goseki, type Target, type Trial } from '@/lib/snipe'
 import type { Compare, Kind, Melding, SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -45,6 +45,7 @@ export function TargetSearch({
   onTarget,
   favorites,
   onFavorites,
+  owned,
   trials,
 }: {
   /** 錬金のやり方ごとの、出るスキルとポイントの範囲 (条件の選択肢に使う) */
@@ -55,6 +56,8 @@ export function TargetSearch({
   onTarget: (t: Target) => void
   favorites: Goseki[]
   onFavorites: Dispatch<SetStateAction<Goseki[]>>
+  /** 所持済みの護石のキー */
+  owned: string[]
   trials: Trial[]
 }) {
   const [view, setView] = useState<'search' | 'favorites'>('search')
@@ -105,6 +108,7 @@ export function TargetSearch({
           onTarget={onTarget}
           favorites={favorites}
           onFavorite={toggleFavorite}
+          owned={owned}
         />
       </div>
       <div hidden={view !== 'favorites'}>
@@ -130,6 +134,7 @@ export function TargetSearch({
                     favorites={favorites}
                     onTarget={onTarget}
                     onFavorite={toggleFavorite}
+                    owned={owned}
                     extra={{
                       label: '試行',
                       cell: (f) =>
@@ -158,6 +163,7 @@ function SearchView({
   onTarget,
   favorites,
   onFavorite,
+  owned,
 }: {
   meldingSkills: MeldingSkills
   skills: SkillInfo[]
@@ -165,9 +171,12 @@ function SearchView({
   onTarget: (t: Target) => void
   favorites: Goseki[]
   onFavorite: (t: Target) => void
+  owned: string[]
 }) {
   const [melding, setMelding] = useState<Melding>('juju')
   const [compare, setCompare] = useState<Compare>('atLeast')
+  /** スキルの選択肢を主要なものだけにするか */
+  const [majorOnly, setMajorOnly] = useState(true)
   /** オンにしているお守りの種類 (このどれかとして出る護石を探す) */
   const [kinds, setKinds] = useState<Kind[]>(() => allKinds('juju'))
   const [skill1, setSkill1] = useState<number | null>(null)
@@ -198,6 +207,9 @@ function SearchView({
   const atLeast = compare === 'atLeast'
   const suffix = atLeast ? ' 以上' : ''
   const range = (id: number | null, slot: Slot) => skills.find((s) => s.id === id)?.[slot]
+  /** その欄の選択肢 (主要だけのときも、選んでいるスキルは残す) */
+  const choices = (slot: Slot, keep: number | null) =>
+    majorOnly ? majorSkills(skillsFor(skills, slot), keep) : skillsFor(skills, slot)
   // スキルを選んだら、ポイントはそのスキルの最小にする (「以上」ならいちばんゆるい値)
   const pickSkill1 = (id: number | null) => {
     setSkill1(id)
@@ -229,11 +241,11 @@ function SearchView({
     abort.current = controller
     try {
       const second = { skill2, pts2: skill2 === null ? null : pts2, slots }
-      // 第 1 スキルを問わないときは、第 1 スキルになれるスキルごとに、その最小のポイント以上で探す
+      // 第 1 スキルを問わないときは、選択肢に出している第 1 スキルごとに、その最小のポイント以上で探す
       // (出ない組み合わせは wasm 側で飛ばす)
       const charms =
         skill1 === null
-          ? skillsFor(skills, 'pts1').map((s) => ({ skill1: s.id, pts1: s.pts1!.min, ...second }))
+          ? choices('pts1', null).map((s) => ({ skill1: s.id, pts1: s.pts1!.min, ...second }))
           : [{ skill1, pts1: pts1!, ...second }]
       const { found, truncated } = await searchCharms(melding, charms, kinds, compare, start, end, {
         onProgress: (done, total) => setProgress(done / total),
@@ -306,6 +318,26 @@ function SearchView({
                 </Button>
               ))}
             </div>
+            <span className="text-sm text-muted-foreground">スキル</span>
+            <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="スキルの選択肢">
+              {(
+                [
+                  [true, '主要'],
+                  [false, 'すべて'],
+                ] as const
+              ).map(([value, label]) => (
+                <Button
+                  key={label}
+                  size="sm"
+                  variant={majorOnly === value ? 'default' : 'outline'}
+                  role="radio"
+                  aria-checked={majorOnly === value}
+                  onClick={() => setMajorOnly(value)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
           </div>
           {/* 錬金の種類・検索条件と、護石の条件の間に区切り線 */}
           <div className="grid gap-4 border-t pt-4 sm:grid-cols-2">
@@ -314,7 +346,7 @@ function SearchView({
                 <div className="flex-1">
                   <SkillCombobox
                     id="skill1"
-                    skills={skillsFor(skills, 'pts1')}
+                    skills={choices('pts1', skill1)}
                     value={skill1}
                     onChange={pickSkill1}
                     placeholder="スキル"
@@ -337,7 +369,7 @@ function SearchView({
                   <SkillCombobox
                     // 「以上」なら第 2 スキルを問わない、「一致」なら第 2 スキルなし
                     id="skill2"
-                    skills={skillsFor(skills, 'pts2')}
+                    skills={choices('pts2', skill2)}
                     value={skill2}
                     onChange={pickSkill2}
                     noneLabel={atLeast ? '問わない' : 'なし'}
@@ -488,6 +520,9 @@ function SearchView({
                 favorites={favorites}
                 onTarget={onTarget}
                 onFavorite={onFavorite}
+                owned={owned}
+                // 狭い幅では、カードの内側の余白を使って左右いっぱいに広げる (9 桁のフレームでも横にはみ出さないように)
+                className="-mx-3 rounded-none border-x-0 sm:mx-0 sm:rounded-lg sm:border-x"
               />
             )}
             {shown < result.rows.length && (

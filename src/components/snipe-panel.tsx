@@ -1,28 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertCircleIcon, CheckIcon, PlayIcon, RotateCcwIcon, SquareIcon, TimerIcon } from 'lucide-react'
+import { CheckIcon, PlayIcon, RotateCcwIcon, SquareIcon, TimerIcon } from 'lucide-react'
 
 import { Countdown } from '@/components/countdown'
-import { TimingSettingsFields } from '@/components/timing-settings'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { FIELD_LABEL, TimingSettingsFields } from '@/components/timing-settings'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { parseFrame, showDrift, showFrame } from '@/lib/frame'
+import { frameToShortTime, parseFrame, showDrift, showFrame } from '@/lib/frame'
 import { meldOutcomes } from '@/lib/navi'
 import { charmText } from '@/lib/skills'
 import type { Target, TimingSettings, Trial } from '@/lib/snipe'
 import { scheduleBeeps } from '@/lib/sound'
-import { FRAME_MS, splitFrames } from '@/lib/timing'
+import { FPS, FRAME_MS, parseInteger, splitFrames } from '@/lib/timing'
 import type { Outcome, SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 /** 答え合わせで出す、狙いの前後のフレーム数 */
 const AROUND = 30
+/** カウントダウンが 0 になってから、0 の表示を残しておく時間 (ミリ秒) */
+const FINISHED_HOLD_MS = 1000
 
 /**
- * 狙いのフレームで錬金するまで: 調合を始めた瞬間から時間を測り、調合スキャンのフレームを入れると、
- * 狙いまでのカウントダウンになる。錬金したら、前後のフレームで出る護石から実際のフレームを選んで記録する。
+ * 狙いのフレームで錬金するまで。
+ * 1. 調合タイマー: 調合を始めると同時に開始し、ホーム画面に戻ると同時に止める (ホーム画面ではゲーム内の時間が
+ *    止まる)。調合スキャンのフレーム (調合開始時点) を入れると、
+ *    現在フレーム = 調合開始時点のフレーム + タイマーの計測フレーム、待機時間 = 狙い − 現在フレーム を出し、
+ *    待機時間をカウントダウンにセットできる
+ * 2. カウントダウン: ゲームに戻った瞬間にスタートを押し、待機時間から数える (調合タイマーを使わず、待機時間を自分で
+ *    入れてもよい)
+ * 3. 答え合わせ: 錬金したら、前後のフレームで出る護石から実際のフレームを選んで記録する
  * 狙いを変えたときは、呼ぶ側が key を変えて作り直す
  */
 export function SnipePanel({
@@ -35,11 +42,13 @@ export function SnipePanel({
   skills: SkillInfo[]
   target: Target
   settings: TimingSettings
-  onSettings: (s: TimingSettings) => void
+  onSettings: (s: Partial<TimingSettings>) => void
   onRecord: (t: Trial) => void
 }) {
   /** 調合を始めた瞬間 (performance.now() の時刻) */
   const [craftStart, setCraftStart] = useState<number | null>(null)
+  /** 調合タイマーを止めた瞬間 (止めるまでは null) */
+  const [craftStop, setCraftStop] = useState<number | null>(null)
   const [scanText, setScanText] = useState('')
   /** カウントダウンの 0 の瞬間と、始めたときの狙いのフレーム。止まっている間は null */
   const [running, setRunning] = useState<{ zero: number; frame: number } | null>(null)
@@ -48,31 +57,52 @@ export function SnipePanel({
   const stopBeeps = useRef<() => void>(() => {})
 
   const scan = parseFrame(scanText)
-  // 調合を始めた瞬間の乱数の位置が scan なので、狙いまではそこから (狙い - scan) フレーム
-  const zeroAt =
-    craftStart !== null && scan !== null ? craftStart + (target.frame - scan + settings.correction) * FRAME_MS : null
-  const [now, setNow] = useState(() => performance.now())
-  // 過ぎたかどうかの判定のために、ときどき時刻を取り直す
-  useEffect(() => {
-    const timer = setInterval(() => setNow(performance.now()), 250)
-    return () => clearInterval(timer)
-  }, [])
-  const passed = zeroAt !== null && zeroAt <= now
+  // タイマーを止めたら、現在フレームと待機時間が決まる (計測フレームはタイマーの表示と同じく切り捨て)
+  const measured = craftStart !== null && craftStop !== null ? Math.floor((craftStop - craftStart) / FRAME_MS) : null
+  const current = measured !== null && scan !== null ? scan + measured : null
+  const wait = current !== null ? target.frame - current : null
+
+  /** カウントダウンの待機時間 (秒とそれに満たないフレーム) */
+  const [waitSecText, setWaitSecText] = useState('5')
+  const [waitFrameText, setWaitFrameText] = useState('0')
+  const waitSec = parseInteger(waitSecText)
+  const waitFrame = parseInteger(waitFrameText)
+  const waitValid = waitSec !== null && waitSec >= 0 && waitFrame !== null && waitFrame >= 0 && waitFrame < FPS
+  /** 最後にカウントダウンを始めたときの待機時間と現在フレーム (記録に残す) */
+  const [lastStart, setLastStart] = useState<Pick<Trial, 'wait' | 'current'>>({})
 
   const stop = useCallback(() => {
     stopBeeps.current()
     setRunning(null)
   }, [])
 
+  /** 調合タイマーで出した待機時間を、カウントダウンの欄に入れる */
+  const reflect = () => {
+    if (wait === null || wait < 0) return
+    const w = splitFrames(wait)
+    setWaitSecText(String(w.seconds))
+    setWaitFrameText(String(w.frames))
+  }
+
+  // カウントダウンのスタート: 押した瞬間 (ゲームに戻った瞬間) から、待機時間 (と補正) で数える
   const start = () => {
-    if (zeroAt === null || passed) return
+    if (!waitValid) return
+    const zeroAt = performance.now() + (waitSec * FPS + waitFrame + settings.correction) * FRAME_MS
     stopBeeps.current()
     stopBeeps.current = scheduleBeeps(zeroAt, settings.beepFrom)
     setRunning({ zero: zeroAt, frame: target.frame })
+    setLastStart({ wait: waitSec * FPS + waitFrame, ...(current !== null && { current }) })
   }
 
   // 画面を離れたとき、別のタイミングに切り替えたときは、予約した音を止める
   useEffect(() => () => stopBeeps.current(), [target.frame])
+
+  // 0 になったら自動で終える (0 の表示を少し残してから、待機時間の表示とスタートに戻す。音はもう鳴り終わっている)
+  useEffect(() => {
+    if (zero === null) return
+    const timer = setTimeout(() => setRunning(null), Math.max(0, zero - performance.now()) + FINISHED_HOLD_MS)
+    return () => clearTimeout(timer)
+  }, [zero])
 
   return (
     <div className="space-y-6">
@@ -83,20 +113,26 @@ export function SnipePanel({
             <CardTitle>1. 調合タイマー</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Elapsed since={craftStart} />
+            <Elapsed since={craftStart} until={craftStop} />
+            {/* 待機中は「調合開始」、計測中は「停止」(ホーム画面に戻ると同時に押す)、止めたら「やり直す」まで時間を残す */}
             <div className="flex gap-2">
               {craftStart === null ? (
                 <Button className="h-12 flex-1 text-base" onClick={() => setCraftStart(performance.now())}>
                   <TimerIcon />
                   調合開始
                 </Button>
+              ) : craftStop === null ? (
+                <Button className="h-12 flex-1 text-base" onClick={() => setCraftStop(performance.now())}>
+                  <SquareIcon />
+                  停止
+                </Button>
               ) : (
                 <Button
                   variant="outline"
                   className="h-12 flex-1"
                   onClick={() => {
-                    stop()
                     setCraftStart(null)
+                    setCraftStop(null)
                   }}
                 >
                   <RotateCcwIcon />
@@ -117,35 +153,75 @@ export function SnipePanel({
                 onChange={(e) => setScanText(e.target.value)}
               />
             </div>
+            {/* タイマーを止めて、スキャンのフレームを入れたら、現在フレームと待機時間を出す */}
+            {current !== null && wait !== null && (
+              <dl className="grid grid-cols-2 gap-3 rounded-lg border px-3 py-2.5 tabular-nums">
+                <div>
+                  <dt className="text-xs text-muted-foreground">現在フレーム</dt>
+                  <dd className="font-medium">{showFrame(current)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">待機時間</dt>
+                  {wait >= 0 ? (
+                    <dd className="font-medium">{frameToShortTime(wait)}</dd>
+                  ) : (
+                    <dd className="font-medium text-destructive">狙いを {frameToShortTime(-wait)} 過ぎている</dd>
+                  )}
+                </div>
+              </dl>
+            )}
+            <Button
+              variant="outline"
+              className="h-12 w-full"
+              onClick={reflect}
+              disabled={wait === null || wait < 0 || zero !== null}
+            >
+              カウントダウンにセット
+            </Button>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>2. 錬金まで</CardTitle>
+            <CardTitle>2. カウントダウン</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            <TimingSettingsFields value={settings} onChange={onSettings} disabled={zero !== null} />
+            {/* 待機時間と目押しの設定は、欄の間を詰めてひとまとまりにする */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Label htmlFor="wait-sec" className={FIELD_LABEL}>
+                  待機時間
+                </Label>
+                <Input
+                  id="wait-sec"
+                  inputMode="numeric"
+                  className="w-20 font-mono"
+                  value={waitSecText}
+                  onChange={(e) => setWaitSecText(e.target.value)}
+                  disabled={zero !== null}
+                />
+                <span className="text-sm text-muted-foreground">秒</span>
+                <Input
+                  inputMode="numeric"
+                  className="w-20 font-mono"
+                  value={waitFrameText}
+                  onChange={(e) => setWaitFrameText(e.target.value)}
+                  disabled={zero !== null}
+                  aria-label="待機時間のフレーム"
+                />
+                <span className="text-sm text-muted-foreground">F</span>
+              </div>
+              <TimingSettingsFields id="snipe" value={settings} onChange={onSettings} disabled={zero !== null} />
+            </div>
+            {/* スタートを押すまでは待機時間のまま止めておく */}
             <Countdown
               target={zero}
-              idleFrames={zeroAt === null ? 0 : Math.max(0, Math.round((zeroAt - now) / FRAME_MS))}
+              idleFrames={waitValid ? waitSec * FPS + waitFrame : 0}
               pattern={settings.pattern}
             />
-            {passed && zero === null && (
-              <Alert variant="destructive">
-                <AlertCircleIcon />
-                <AlertDescription>
-                  狙いを{' '}
-                  {(() => {
-                    const over = splitFrames(Math.round((now - zeroAt!) / FRAME_MS))
-                    return `${over.seconds}秒 ${over.frames}F`
-                  })()}{' '}
-                  過ぎています
-                </AlertDescription>
-              </Alert>
-            )}
+            {!waitValid && <p className="text-sm text-destructive">整数で入力 (F は 0〜29)</p>}
             {zero === null ? (
-              <Button className="h-14 w-full text-base" onClick={start} disabled={zeroAt === null || passed}>
+              <Button className="h-14 w-full text-base" onClick={start} disabled={!waitValid}>
                 <PlayIcon />
                 スタート
               </Button>
@@ -159,13 +235,19 @@ export function SnipePanel({
         </Card>
       </div>
 
-      <Review skills={skills} target={target} correction={settings.correction} onRecord={onRecord} />
+      <Review
+        skills={skills}
+        target={target}
+        correction={settings.correction}
+        context={lastStart}
+        onRecord={onRecord}
+      />
     </div>
   )
 }
 
-/** 調合を始めてからの時間 (止まっていれば 00:00 00F)。毎フレームの更新は要素を直接書き換える */
-function Elapsed({ since }: { since: number | null }) {
+/** 調合を始めてからの時間 (始める前は 00:00 00F、止めたら止めた瞬間の時間)。毎フレームの更新は要素を直接書き換える */
+function Elapsed({ since, until }: { since: number | null; until: number | null }) {
   const time = useRef<HTMLSpanElement>(null)
   const frames = useRef<HTMLSpanElement>(null)
   useEffect(() => {
@@ -180,6 +262,11 @@ function Elapsed({ since }: { since: number | null }) {
       draw(0)
       return
     }
+    // 止めたら、止めた瞬間の時間のまま
+    if (until !== null) {
+      draw(until - since)
+      return
+    }
     let frame = 0
     const loop = () => {
       draw(performance.now() - since)
@@ -187,7 +274,7 @@ function Elapsed({ since }: { since: number | null }) {
     }
     loop()
     return () => cancelAnimationFrame(frame)
-  }, [since])
+  }, [since, until])
   return (
     <p className={cn('text-center font-mono tabular-nums', since === null && 'text-muted-foreground')}>
       <span ref={time} className="text-5xl font-semibold" />
@@ -201,11 +288,14 @@ function Review({
   skills,
   target,
   correction,
+  context,
   onRecord,
 }: {
   skills: SkillInfo[]
   target: Target
   correction: number
+  /** 記録に一緒に残す、カウントダウンを始めたときの待機時間と現在フレーム */
+  context: Pick<Trial, 'wait' | 'current'>
   onRecord: (t: Trial) => void
 }) {
   const [outcomes, setOutcomes] = useState<Outcome[] | null>(null)
@@ -219,11 +309,22 @@ function Review({
     )
   }, [target])
 
-  // 一覧は狙いの行が真ん中に来るようにしておく
+  // 一覧は狙いの行が真ん中に来るようにしておく。読み込んだときにタブが隠れていると高さが 0 で合わせられないので、
+  // 見えて高さが付いたときに合わせる (一度合わせたら、あとは動かさない)
   useEffect(() => {
-    const row = list.current?.querySelector<HTMLElement>('[data-target]')
-    if (row && list.current)
-      list.current.scrollTop = row.offsetTop - list.current.clientHeight / 2 + row.clientHeight / 2
+    const el = list.current
+    if (!el) return
+    let centered = false
+    const center = () => {
+      const row = el.querySelector<HTMLElement>('[data-target]')
+      if (centered || !row || el.clientHeight === 0) return
+      el.scrollTop = row.offsetTop - el.clientHeight / 2 + row.clientHeight / 2
+      centered = true
+    }
+    center()
+    const observer = new ResizeObserver(center)
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [outcomes])
 
   const actual = parseFrame(actualText)
@@ -231,7 +332,7 @@ function Review({
 
   const record = () => {
     if (actual === null) return
-    onRecord({ at: Date.now(), target, correction, actual })
+    onRecord({ at: Date.now(), target, correction, actual, ...context })
     setSaved(true)
   }
 
@@ -254,17 +355,22 @@ function Review({
                     setActualText(String(o.frame))
                     setSaved(false)
                   }}
+                  // 狙いの行は薄く塗って「狙い」と添え、選んだ行は塗りつぶす
                   className={cn(
-                    'grid w-full grid-cols-[3rem_6.5rem_1fr] items-center gap-2 px-3 py-2 text-left text-sm tabular-nums hover:bg-muted/50',
-                    offset === 0 && 'font-semibold text-primary',
-                    selected && 'bg-primary/10',
+                    'grid w-full grid-cols-[2.5rem_6rem_1fr_auto] items-center gap-2 px-3 py-2 text-left text-sm whitespace-nowrap tabular-nums',
+                    selected
+                      ? 'bg-primary text-primary-foreground'
+                      : offset === 0
+                        ? 'bg-primary/15 font-semibold hover:bg-primary/25'
+                        : 'hover:bg-muted/50',
                   )}
                 >
                   <span className="text-right font-mono">
                     {offset === 0 ? '±0' : offset > 0 ? `+${offset}` : offset}
                   </span>
-                  <span className="font-mono text-muted-foreground">{showFrame(o.frame)}</span>
+                  <span className={cn('font-mono', !selected && 'text-muted-foreground')}>{showFrame(o.frame)}</span>
                   <span>{charm ? charmText(skills, charm.charm) : '―'}</span>
+                  <span className={cn('text-xs', !selected && 'text-primary')}>{offset === 0 && '狙い'}</span>
                 </button>
               </li>
             )
