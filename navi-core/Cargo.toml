@@ -1,0 +1,19 @@
+[package]
+name = "navi-core"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "mhxx-snipe-navigator の wasm の入口 (乱数は mhxx-rand)"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+mhxx-rand = { git = "https://github.com/skst328/mhxx-rand", tag = "v0.1.0" }
+wasm-bindgen = "0.2.128"
+serde = { version = "1.0.229", features = ["derive"] }
+serde-wasm-bindgen = "0.6.5"
+tsify = { version = "0.5.8", default-features = false, features = ["js"] }
+
+[profile.release]
+lto = true
