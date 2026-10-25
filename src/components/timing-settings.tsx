@@ -1,44 +1,64 @@
+import { MinusIcon, PlusIcon } from 'lucide-react'
+
 import { IntegerInput } from '@/components/integer-input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { PATTERNS } from '@/lib/pattern'
 import type { TimingSettings } from '@/lib/snipe'
 
-/** 入力欄の横に置く見出し。どれも同じ幅にして、欄の頭をそろえる (いちばん長い「待機時間」に合わせる) */
-export const FIELD_LABEL = 'w-16 shrink-0 text-sm font-normal text-muted-foreground'
+/** 入力欄の横に置く見出し。どれも同じ幅にして、欄の頭をそろえる (いちばん長い「待機時間補正」に合わせる) */
+export const FIELD_LABEL = 'w-24 shrink-0 text-sm font-normal text-muted-foreground'
 
-/** 目押しの設定: 補正・音・合図のパターン (スナイプと練習と設定で共通)。変えた項目だけを渡す */
+/**
+ * 目押しの設定: 補正・音・合図のパターン (スナイプと練習と設定で共通)。変えた項目だけを渡す。
+ * 待機時間補正はスナイプだけで使うので、waitCorrection が false なら出さない
+ */
 export function TimingSettingsFields({
   id,
   value,
   onChange,
+  waitCorrection = true,
   disabled,
 }: {
   /** 欄の id の頭 (同じ欄が画面に何組かあるので) */
   id: string
   value: TimingSettings
   onChange: (v: Partial<TimingSettings>) => void
+  waitCorrection?: boolean
   disabled?: boolean
 }) {
   return (
     <div className="space-y-3">
-      <NumberField
-        id={`${id}-correction`}
-        label="補正"
-        unit="F"
-        value={value.correction}
-        onChange={(correction) => onChange({ correction })}
+      {waitCorrection && (
+        <CorrectionField
+          id={`${id}-wait-correction`}
+          label="待機時間補正"
+          value={value.waitCorrection}
+          onChange={(waitCorrection) => onChange({ waitCorrection })}
+          disabled={disabled}
+        />
+      )}
+      <CorrectionField
+        id={`${id}-sound-correction`}
+        label="音ずれ補正"
+        value={value.soundCorrection}
+        onChange={(soundCorrection) => onChange({ soundCorrection })}
         disabled={disabled}
       />
-      <NumberField
-        id={`${id}-beep`}
-        label="音"
-        unit="秒前から"
-        value={value.beepFrom}
-        min={0}
-        onChange={(beepFrom) => onChange({ beepFrom })}
-        disabled={disabled}
-      />
+      <div className="flex items-center gap-2">
+        <Label htmlFor={`${id}-beep`} className={FIELD_LABEL}>
+          合図の音
+        </Label>
+        <IntegerInput
+          id={`${id}-beep`}
+          className="w-16 font-mono"
+          value={value.beepFrom}
+          min={0}
+          onChange={(beepFrom) => onChange({ beepFrom })}
+          disabled={disabled}
+        />
+        <span className="text-sm text-muted-foreground">秒前から</span>
+      </div>
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="目押しのパターン">
         {PATTERNS.map((p) => (
           <Button
@@ -58,21 +78,17 @@ export function TimingSettingsFields({
   )
 }
 
-/** 見出しと単位を横に置いた整数の欄 */
-function NumberField({
+/** 補正の欄 (F)。スマホの数字のキーボードには「-」が無いことがあるので、− と + のボタンでも 1 ずつ変えられる */
+function CorrectionField({
   id,
   label,
-  unit,
   value,
-  min,
   onChange,
   disabled,
 }: {
   id: string
   label: string
-  unit: string
   value: number
-  min?: number
   onChange: (v: number) => void
   disabled?: boolean
 }) {
@@ -81,15 +97,34 @@ function NumberField({
       <Label htmlFor={id} className={FIELD_LABEL}>
         {label}
       </Label>
-      <IntegerInput
-        id={id}
-        className="w-20 font-mono"
-        value={value}
-        min={min}
-        onChange={onChange}
-        disabled={disabled}
-      />
-      <span className="text-sm text-muted-foreground">{unit}</span>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => onChange(value - 1)}
+          disabled={disabled}
+          aria-label={`${label}を 1 減らす`}
+        >
+          <MinusIcon />
+        </Button>
+        <IntegerInput
+          id={id}
+          className="w-16 text-center font-mono"
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+        />
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => onChange(value + 1)}
+          disabled={disabled}
+          aria-label={`${label}を 1 増やす`}
+        >
+          <PlusIcon />
+        </Button>
+      </div>
+      <span className="text-sm text-muted-foreground">F</span>
     </div>
   )
 }

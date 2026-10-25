@@ -20,6 +20,8 @@ import { cn } from '@/lib/utils'
 const AROUND = 30
 /** カウントダウンが 0 になってから、0 の表示を残しておく時間 (ミリ秒) */
 const FINISHED_HOLD_MS = 1000
+/** 0 の瞬間を、狙いのフレームの始まりからどれだけ後ろに置くか (F)。真ん中に置き、前後どちらに押しても半フレームの余裕を持たせる */
+const AIM_IN_FRAME = 0.5
 
 /**
  * 狙いのフレームで錬金するまで。
@@ -57,8 +59,10 @@ export function SnipePanel({
   const stopBeeps = useRef<() => void>(() => {})
 
   const scan = parseFrame(scanText)
-  // タイマーを止めたら、現在フレームと待機時間が決まる (計測フレームはタイマーの表示と同じく切り捨て)
-  const measured = craftStart !== null && craftStop !== null ? Math.floor((craftStop - craftStart) / FRAME_MS) : null
+  // タイマーを止めたら、現在フレームと待機時間が決まる (計測フレームはタイマーの表示と同じく切り捨て。
+  // 切り捨てた端数は、カウントダウンにセットしたときに待機時間から引く)
+  const elapsed = craftStart !== null && craftStop !== null ? (craftStop - craftStart) / FRAME_MS : null
+  const measured = elapsed !== null ? Math.floor(elapsed) : null
   const current = measured !== null && scan !== null ? scan + measured : null
   const wait = current !== null ? target.frame - current : null
 
@@ -68,6 +72,8 @@ export function SnipePanel({
   const waitSec = parseInteger(waitSecText)
   const waitFrame = parseInteger(waitFrameText)
   const waitValid = waitSec !== null && waitSec >= 0 && waitFrame !== null && waitFrame >= 0 && waitFrame < FPS
+  /** 調合タイマーからセットした待機時間の、表示では切り捨てた端数 (F、0 以上 1 未満)。欄を書き換えたら 0 */
+  const [fraction, setFraction] = useState(0)
   /** 最後にカウントダウンを始めたときの待機時間と現在フレーム (記録に残す) */
   const [lastStart, setLastStart] = useState<Pick<Trial, 'wait' | 'current'>>({})
 
@@ -82,12 +88,16 @@ export function SnipePanel({
     const w = splitFrames(wait)
     setWaitSecText(String(w.seconds))
     setWaitFrameText(String(w.frames))
+    setFraction(elapsed! - measured!)
   }
 
   // カウントダウンのスタート: 押した瞬間 (ゲームに戻った瞬間) から、待機時間 (と補正) で数える
   const start = () => {
     if (!waitValid) return
-    const zeroAt = performance.now() + (waitSec * FPS + waitFrame + settings.correction) * FRAME_MS
+    // 待機時間 (端数込み) で狙いのフレームの始まりに着くので、その真ん中を 0 にする。
+    // 待機時間補正はゲーム側のずれ、音ずれ補正は合図の遅れを打ち消す。どちらも 0 の瞬間をずらす
+    const frames = waitSec * FPS + waitFrame - fraction + AIM_IN_FRAME
+    const zeroAt = performance.now() + (frames + settings.waitCorrection + settings.soundCorrection) * FRAME_MS
     stopBeeps.current()
     stopBeeps.current = scheduleBeeps(zeroAt, settings.beepFrom)
     setRunning({ zero: zeroAt, frame: target.frame })
@@ -195,17 +205,23 @@ export function SnipePanel({
                 <Input
                   id="wait-sec"
                   inputMode="numeric"
-                  className="w-20 font-mono"
+                  className="w-16 font-mono"
                   value={waitSecText}
-                  onChange={(e) => setWaitSecText(e.target.value)}
+                  onChange={(e) => {
+                    setWaitSecText(e.target.value)
+                    setFraction(0)
+                  }}
                   disabled={zero !== null}
                 />
                 <span className="text-sm text-muted-foreground">秒</span>
                 <Input
                   inputMode="numeric"
-                  className="w-20 font-mono"
+                  className="w-16 font-mono"
                   value={waitFrameText}
-                  onChange={(e) => setWaitFrameText(e.target.value)}
+                  onChange={(e) => {
+                    setWaitFrameText(e.target.value)
+                    setFraction(0)
+                  }}
                   disabled={zero !== null}
                   aria-label="待機時間のフレーム"
                 />
@@ -238,7 +254,7 @@ export function SnipePanel({
       <Review
         skills={skills}
         target={target}
-        correction={settings.correction}
+        corrections={{ waitCorrection: settings.waitCorrection, soundCorrection: settings.soundCorrection }}
         context={lastStart}
         onRecord={onRecord}
       />
@@ -287,13 +303,14 @@ function Elapsed({ since, until }: { since: number | null; until: number | null 
 function Review({
   skills,
   target,
-  correction,
+  corrections,
   context,
   onRecord,
 }: {
   skills: SkillInfo[]
   target: Target
-  correction: number
+  /** 記録に一緒に残す補正 */
+  corrections: Pick<Trial, 'waitCorrection' | 'soundCorrection'>
   /** 記録に一緒に残す、カウントダウンを始めたときの待機時間と現在フレーム */
   context: Pick<Trial, 'wait' | 'current'>
   onRecord: (t: Trial) => void
@@ -332,7 +349,7 @@ function Review({
 
   const record = () => {
     if (actual === null) return
-    onRecord({ at: Date.now(), target, correction, actual, ...context })
+    onRecord({ at: Date.now(), target, ...corrections, actual, ...context })
     setSaved(true)
   }
 

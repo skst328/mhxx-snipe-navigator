@@ -28,8 +28,9 @@ export interface Trial {
   /** 記録した時刻 (Date.now()) */
   at: number
   target: Target
-  /** 補正 (F) */
-  correction: number
+  /** 待機時間補正と音ずれ補正 (F) */
+  waitCorrection: number
+  soundCorrection: number
   /** 実際に錬金したフレーム */
   actual: number
   /** 調合タイマーで出した現在フレーム (調合タイマーを使っていなければ無い) */
@@ -38,11 +39,13 @@ export interface Trial {
   wait?: number
 }
 
-/** 目押しの設定 (スナイプと練習で共通) */
+/** 目押しの設定 (スナイプと練習で共通。待機時間補正はスナイプだけ) */
 export interface TimingSettings {
   pattern: Pattern
-  /** 0 になる瞬間をずらす量 (F、+ で遅く) */
-  correction: number
+  /** 待機時間に足す量 (F、+ で遅く)。ゲーム側のずれを打ち消す */
+  waitCorrection: number
+  /** 0 になる瞬間の合図 (音と画面) をずらす量 (F、+ で遅く)。端末の音や画面の遅れを打ち消す */
+  soundCorrection: number
   /** 音を鳴らし始める残り秒数 */
   beepFrom: number
 }
@@ -61,7 +64,8 @@ export type Settings = TimingSettings & MashSettings
 
 export const DEFAULT_SETTINGS: Settings = {
   pattern: 'dot',
-  correction: 0,
+  waitCorrection: 0,
+  soundCorrection: 0,
   beepFrom: 5,
   bpm: 60,
   advance: 700,

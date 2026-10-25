@@ -31,19 +31,42 @@ export function stopTones(oscillators: Iterable<OscillatorNode>) {
   }
 }
 
+/** 音を予約しておく先の長さ (ミリ秒)。これより先の音は、近づいてから予約する */
+const LOOKAHEAD_MS = 200
+/** 予約の見直しの間隔 (ミリ秒) */
+const TICK_MS = 25
+
 /**
  * 0 になる瞬間 (target、performance.now() の時刻) に向けて、残り from 秒から 1 秒ごとに短い音を鳴らす。
  * 最後 (0 の瞬間) だけ高い音にする。鳴らす時刻は Web Audio に予約するので、画面の描画が遅れても音はずれない。
+ * Web Audio の時計は performance.now() とは別に進むので、押したときにまとめて予約すると、待機が長いほど
+ * ずれが溜まる。鳴らす直前に、その時点の両方の時計から予約する。
  * ブラウザは操作の中でしか音を出させないので、ボタンを押したときに呼ぶ。止める関数を返す
  */
 export function scheduleBeeps(target: number, from: number): () => void {
   if (from <= 0) return () => {}
   const ctx = audio()
-  const oscillators: OscillatorNode[] = []
-  for (let k = from; k >= 0; k--) {
-    const at = ctx.currentTime + (target - k * 1000 - performance.now()) / 1000
-    if (at < ctx.currentTime) continue
-    oscillators.push(tone(ctx, at, k === 0 ? 1320 : 880))
+  const scheduled = new Set<OscillatorNode>()
+  let k = from
+  const schedule = () => {
+    const now = performance.now()
+    while (k >= 0) {
+      const at = target - k * 1000
+      if (at > now + LOOKAHEAD_MS) break
+      // 過ぎてしまった音は鳴らさない
+      if (at >= now) {
+        const osc = tone(ctx, ctx.currentTime + (at - now) / 1000, k === 0 ? 1320 : 880)
+        scheduled.add(osc)
+        osc.onended = () => scheduled.delete(osc)
+      }
+      k--
+    }
+    if (k < 0) clearInterval(timer)
   }
-  return () => stopTones(oscillators)
+  const timer = setInterval(schedule, TICK_MS)
+  schedule()
+  return () => {
+    clearInterval(timer)
+    stopTones(scheduled)
+  }
 }

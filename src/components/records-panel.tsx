@@ -89,15 +89,16 @@ export function RecordsPanel({
 
         <DriftChart drifts={[...drifts].reverse()} />
 
-        {/* 検索の表と同じく、列は中身の幅に詰めて左から並べ、薄い縦線で区切る */}
-        <div className="overflow-x-auto rounded-lg border">
+        {/* 検索の表と同じく、列は中身の幅に詰めて左から並べ、薄い縦線で区切る。
+            狭い幅では、カードの内側の余白を使って左右いっぱいに広げる (横にはみ出さないように) */}
+        <div className="-mx-(--card-spacing) overflow-x-auto border-y sm:mx-0 sm:rounded-lg sm:border">
           <table className="w-full text-sm whitespace-nowrap tabular-nums [&_td]:py-2 [&_th]:pt-2 [&_th]:pb-1.5 [&_th]:text-xs [&_th]:font-normal [&_th]:text-muted-foreground">
             <thead className="border-b">
               <tr>
                 <th className={cn(CELL, 'text-left')}>#</th>
                 <th className={cn(COLUMN, 'text-right')}>調合時点</th>
                 <th className={cn(COLUMN, 'text-right')}>待機</th>
-                <th className={cn(COLUMN, 'text-right')}>補正</th>
+                <th className={cn(COLUMN, 'text-left')}>補正</th>
                 <th className={cn(COLUMN, 'text-right')}>ズレ</th>
                 <th className="w-full" />
               </tr>
@@ -117,7 +118,15 @@ export function RecordsPanel({
                     <td className={cn(COLUMN, 'text-right')}>
                       {t.wait === undefined ? '―' : frameToShortTime(t.wait)}
                     </td>
-                    <td className={cn(COLUMN, 'text-right')}>{showDrift(t.correction)}</td>
+                    <td className={COLUMN}>
+                      {/* 2 つの補正は 1 列にまとめて 2 行で出す (列を分けると狭い幅で表がはみ出すので)。値は右でそろえる */}
+                      <dl className="grid grid-cols-[auto_auto] items-baseline gap-x-1">
+                        <dt className="text-xs text-muted-foreground">待機時間:</dt>
+                        <dd className="text-right">{showDrift(t.waitCorrection)}</dd>
+                        <dt className="text-xs text-muted-foreground">音ずれ:</dt>
+                        <dd className="text-right">{showDrift(t.soundCorrection)}</dd>
+                      </dl>
+                    </td>
                     <td className={cn(COLUMN, 'text-right', d === 0 && 'text-success')}>{showDrift(d)}</td>
                     <td />
                   </tr>

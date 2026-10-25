@@ -49,11 +49,11 @@ const TABS: { value: Tab; label: string; icon: typeof SearchIcon }[] = [
 export default function App() {
   const [tab, setTab] = useStored<Tab>('tab', 'target')
   const [target, setTarget] = useStored<Target | null>('target-goseki', null)
-  const [trials, setTrials] = useStored<Trial[]>('trials', [])
+  const [trials, setTrials] = useStored<Trial[]>('trial-records', [])
   /** 設定 (各タブの初期値) */
-  const [defaults, setDefaults] = useStored<Settings>('settings', DEFAULT_SETTINGS)
+  const [defaults, setDefaults] = useStored<Settings>('default-settings', DEFAULT_SETTINGS)
   /** 狙いがある間にタブで変えた値と、その狙いの護石のキー (狙いを変えたら初期値に戻る) */
-  const [changed, setChanged] = useStored<{ key: string; values: Partial<Settings> }>('changed-settings', {
+  const [changed, setChanged] = useStored<{ key: string; values: Partial<Settings> }>('settings-by-target', {
     key: '',
     values: {},
   })
