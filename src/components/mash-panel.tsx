@@ -3,7 +3,7 @@ import { PauseIcon, PlayIcon, RotateCcwIcon } from 'lucide-react'
 
 import { IntegerField } from '@/components/integer-input'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { frameToShortTime, showFrame } from '@/lib/frame'
 import { beatsDone, runMetronome, type MetronomeRun } from '@/lib/metronome'
 import type { MashSettings, Target } from '@/lib/snipe'
@@ -24,7 +24,7 @@ export function MashPanel({
   settings,
   onSettings,
 }: {
-  target: Target | null
+  target: Target
   settings: MashSettings
   onSettings: (s: Partial<MashSettings>) => void
 }) {
@@ -39,7 +39,7 @@ export function MashPanel({
   const finished = done >= total
   // 推定着地: オフセットに、1 回ごとの連打で進む分と、1 拍のあいだに時間で進む分 (30F × 60 / BPM) を足す
   const landing = offset + Math.round(total * (advance + (FPS * 60) / bpm))
-  const margin = target ? target.frame - landing : null
+  const margin = target.frame - landing
 
   // 鳴らしている間は、何回目まで鳴ったかを時刻から数え直す
   useEffect(() => {
@@ -89,6 +89,9 @@ export function MashPanel({
 
   return (
     <Card>
+      <CardHeader>
+        <CardTitle>1. 連打</CardTitle>
+      </CardHeader>
       <CardContent className="space-y-5">
         {/* 狭い幅では 2 つずつ、広い幅では 4 つを 1 行に */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -138,16 +141,14 @@ export function MashPanel({
               <span className="block text-sm font-normal text-muted-foreground">{frameToShortTime(landing)}</span>
             </dd>
           </div>
-          {margin !== null && (
-            <div>
-              <dt className="text-xs text-muted-foreground">狙いまでの猶予</dt>
-              {margin >= 0 ? (
-                <dd className="font-medium">約 {frameToShortTime(margin)}</dd>
-              ) : (
-                <dd className="font-medium text-destructive">狙いを {frameToShortTime(-margin)} 越える</dd>
-              )}
-            </div>
-          )}
+          <div>
+            <dt className="text-xs text-muted-foreground">狙いまでの猶予</dt>
+            {margin >= 0 ? (
+              <dd className="font-medium">約 {frameToShortTime(margin)}</dd>
+            ) : (
+              <dd className="font-medium text-destructive">狙いを {frameToShortTime(-margin)} 越える</dd>
+            )}
+          </div>
         </dl>
 
         <div className="space-y-3 text-center">

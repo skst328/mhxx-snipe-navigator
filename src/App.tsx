@@ -6,11 +6,9 @@ import {
   DumbbellIcon,
   SearchIcon,
   SettingsIcon,
-  TimerIcon,
   XIcon,
 } from 'lucide-react'
 
-import { MashPanel } from '@/components/mash-panel'
 import { PracticePanel } from '@/components/practice-panel'
 import { RecordsPanel } from '@/components/records-panel'
 import { SettingsDialog } from '@/components/settings-dialog'
@@ -36,11 +34,10 @@ import {
 import { useStored } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 
-type Tab = 'target' | 'mash' | 'snipe' | 'records' | 'practice'
+type Tab = 'target' | 'snipe' | 'records' | 'practice'
 
 const TABS: { value: Tab; label: string; icon: typeof SearchIcon }[] = [
   { value: 'target', label: '検索', icon: SearchIcon },
-  { value: 'mash', label: '連打', icon: TimerIcon },
   { value: 'snipe', label: 'スナイプ', icon: CrosshairIcon },
   { value: 'records', label: '記録', icon: ChartColumnIcon },
   { value: 'practice', label: '練習', icon: DumbbellIcon },
@@ -165,7 +162,7 @@ export default function App() {
           </Alert>
         )}
 
-        <nav role="tablist" className="grid grid-cols-5 gap-1 rounded-lg bg-muted p-1">
+        <nav role="tablist" className="grid grid-cols-4 gap-1 rounded-lg bg-muted p-1">
           {TABS.map(({ value, label, icon: Icon }) => (
             <button
               key={value}
@@ -198,9 +195,6 @@ export default function App() {
                 owned={owned}
                 trials={trials}
               />
-            </div>
-            <div role="tabpanel" hidden={tab !== 'mash'}>
-              <MashPanel target={target} settings={settings} onSettings={changeSettings} />
             </div>
             <div role="tabpanel" hidden={tab !== 'snipe'}>
               {target ? (

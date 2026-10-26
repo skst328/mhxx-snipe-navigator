@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckIcon, PartyPopperIcon, PlayIcon, RotateCcwIcon, SquareIcon, TimerIcon } from 'lucide-react'
 
 import { Countdown } from '@/components/countdown'
+import { MashPanel } from '@/components/mash-panel'
 import { FIELD_LABEL, TimingSettingsFields } from '@/components/timing-settings'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { frameToShortTime, parseFrame, showDrift, showFrame } from '@/lib/frame'
 import { meldOutcomes } from '@/lib/navi'
 import { charmText } from '@/lib/skills'
-import { drift, gosekiKey, type Target, type TimingSettings, type Trial } from '@/lib/snipe'
+import { drift, gosekiKey, type Settings, type Target, type Trial } from '@/lib/snipe'
 import { scheduleBeeps } from '@/lib/sound'
 import { FPS, FRAME_MS, parseInteger, splitFrames } from '@/lib/timing'
 import type { Outcome, SkillInfo } from '@/lib/types'
@@ -25,13 +26,14 @@ const AIM_IN_FRAME = 0.5
 
 /**
  * 狙いのフレームで錬金するまで。
- * 1. 調合タイマー: 調合を始めると同時に開始し、ホーム画面に戻ると同時に止める (ホーム画面ではゲーム内の時間が
+ * 1. 連打: 乱数を狙いの手前まで進める (ゲームを操作しながら使うので、ほかの手順と同じタブに置く)
+ * 2. 調合タイマー: 調合を始めると同時に開始し、ホーム画面に戻ると同時に止める (ホーム画面ではゲーム内の時間が
  *    止まる)。調合スキャンのフレーム (調合開始時点) を入れると、
  *    現在フレーム = 調合開始時点のフレーム + タイマーの計測フレーム、待機時間 = 狙い − 現在フレーム を出し、
  *    待機時間をカウントダウンにセットできる
- * 2. カウントダウン: ゲームに戻った瞬間にスタートを押し、待機時間から数える (調合タイマーを使わず、待機時間を自分で
+ * 3. カウントダウン: ゲームに戻った瞬間にスタートを押し、待機時間から数える (調合タイマーを使わず、待機時間を自分で
  *    入れてもよい)
- * 3. 答え合わせ: 錬金したら、前後のフレームで出る護石から実際のフレームを選んで記録する
+ * 4. 答え合わせ: 錬金したら、前後のフレームで出る護石から実際のフレームを選んで記録する
  * 狙いを変えたときは、呼ぶ側が key を変えて作り直す
  */
 export function SnipePanel({
@@ -44,8 +46,8 @@ export function SnipePanel({
 }: {
   skills: SkillInfo[]
   target: Target
-  settings: TimingSettings
-  onSettings: (s: Partial<TimingSettings>) => void
+  settings: Settings
+  onSettings: (s: Partial<Settings>) => void
   /** 新しい順 */
   trials: Trial[]
   onRecord: (t: Trial) => void
@@ -119,11 +121,12 @@ export function SnipePanel({
 
   return (
     <div className="space-y-6">
+      <MashPanel target={target} settings={settings} onSettings={onSettings} />
       {/* 広い幅では、調合タイマーとカウントダウンを横に並べる */}
       <div className="grid gap-6 md:grid-cols-2 md:items-start">
         <Card>
           <CardHeader>
-            <CardTitle>1. 調合タイマー</CardTitle>
+            <CardTitle>2. 調合タイマー</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Elapsed since={craftStart} until={craftStop} />
@@ -196,7 +199,7 @@ export function SnipePanel({
 
         <Card>
           <CardHeader>
-            <CardTitle>2. カウントダウン</CardTitle>
+            <CardTitle>3. カウントダウン</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             {/* 待機時間と目押しの設定は、欄の間を詰めてひとまとまりにする */}
@@ -367,7 +370,7 @@ function Review({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>3. 答え合わせ</CardTitle>
+        <CardTitle>4. 答え合わせ</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <ul ref={list} className="relative max-h-80 divide-y overflow-y-auto rounded-lg border">

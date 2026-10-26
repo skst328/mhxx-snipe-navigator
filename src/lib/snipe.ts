@@ -68,7 +68,7 @@ export const DEFAULT_SETTINGS: Settings = {
   soundCorrection: 0,
   beepFrom: 5,
   bpm: 60,
-  advance: 700,
+  advance: 702,
   offset: 0,
 }
 
