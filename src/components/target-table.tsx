@@ -8,17 +8,23 @@ import { gosekiKey, targetKey, type Goseki, type Target } from '@/lib/snipe'
 import type { Charm, SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-/** 護石の中身を、スキル1・スキル2・スロットの列に分けて出す (スキル名とポイントは詰める)。
- * どれも狙いを決める条件なので、3 つとも同じ強さで出す。span 行ぶん縦に結合する */
+/** 護石の中身を、スキルとスロットの列に分けて出す。スキルの列は第 1 スキルと第 2 スキルを 2 行に分ける
+ * (正式名称は長いので、横に並べると狭い幅で表がはみ出す。スキル名とポイントは詰める)。
+ * どれも狙いを決める条件なので、同じ強さで出す。span 行ぶん縦に結合する */
 function CharmCells({ skills, charm, span }: { skills: SkillInfo[]; charm: Charm; span: number }) {
   return (
     <>
       <td rowSpan={span} className={FIRST}>
-        {skillName(skills, charm.skill1)}
-        {charm.pts1}
-      </td>
-      <td rowSpan={span} className={COLUMN}>
-        {charm.skill2 !== null && `${skillName(skills, charm.skill2)}${charm.pts2}`}
+        <div>
+          {skillName(skills, charm.skill1)}
+          {charm.pts1}
+        </div>
+        {charm.skill2 !== null && (
+          <div>
+            {skillName(skills, charm.skill2)}
+            {charm.pts2}
+          </div>
+        )}
       </td>
       <td rowSpan={span} className={COLUMN}>
         S{charm.slots}
@@ -27,15 +33,15 @@ function CharmCells({ skills, charm, span }: { skills: SkillInfo[]; charm: Charm
   )
 }
 
-/** スキル1 より後ろの列。見出しと中身の対応が分かるように、左に薄い線を引く。
+/** スキルより後ろの列。見出しと中身の対応が分かるように、左に薄い線を引く。
  * どの列も中身の幅に詰めて左から並べる (余った幅は狙うの手前の空の列が持ち、狙うは右端に置く) */
 const COLUMN = 'w-px border-l border-border/60 px-1 sm:px-3'
 
-/** 最初の列 (スキル1)。☆ との間も少し空ける */
+/** 最初の列 (スキル)。☆ との間も少し空ける */
 const FIRST = 'w-px pr-1 pl-1 sm:pr-3 sm:pl-2'
 
 /**
- * 狙いの候補の表: ☆・スキル1・スキル2・スロット (ここまで護石ごと) と、錬金のフレーム・時間 (広い幅だけ)・鑑定順・狙う
+ * 狙いの候補の表: ☆・スキル (第 1 と第 2 を 2 行で)・スロット (ここまで護石ごと) と、錬金のフレーム・時間 (広い幅だけ)・鑑定順・狙う
  * (タイミングごと)。同じ護石の行 (錬金するフレームと鑑定順だけが違うもの) を隣どうしに並べて渡すと、
  * 護石ごとの列を縦に結合して、護石 1 つにタイミングが何行か並ぶ形にする。
  * extra があれば、鑑定順の後ろに列を足す (お気に入りの試行回数など)。
@@ -74,8 +80,7 @@ export function TargetTable({
               <span className="sr-only">お気に入り</span>
             </th>
             {/* 見出しの余白と寄せ方は、下の中身の列と同じにする (縦の位置を揃える) */}
-            <th className={cn(FIRST, 'text-left')}>スキル1</th>
-            <th className={cn(COLUMN, 'text-left')}>スキル2</th>
+            <th className={cn(FIRST, 'text-left')}>スキル</th>
             {/* 狭い幅では見出しを縮める (中身の S3 より見出しのほうが長く、表がはみ出すので) */}
             <th className={cn(COLUMN, 'text-left')}>
               スロ<span className="hidden sm:inline">ット</span>

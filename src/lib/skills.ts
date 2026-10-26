@@ -14,7 +14,7 @@ export function skillsFor(skills: SkillInfo[], slot: Slot): SkillInfo[] {
   return skills.filter((s) => s[slot] !== null)
 }
 
-/** 主要なスキル */
+/** 主要なスキル (略称) */
 const MAJOR = new Set([
   ...['聴覚', '寒冷', '炎熱', '属攻', '斬味', '抜会', '納刀', '納研', '反動', '通強', '貫強', '散強'],
   ...['重強', '射法', '弾節', '痛撃', '連撃', '属会', '溜短', '回性', '回距', '泡沫', '闘魂', '達人'],
@@ -23,7 +23,7 @@ const MAJOR = new Set([
 
 /** 主要なスキルだけにする (keep は主要でなくても残す) */
 export function majorSkills(skills: SkillInfo[], keep: number | null = null): SkillInfo[] {
-  return skills.filter((s) => MAJOR.has(s.name) || s.id === keep)
+  return skills.filter((s) => MAJOR.has(s.abbr) || s.id === keep)
 }
 
 /** ポイントの選択肢 (錬金で出る範囲) */

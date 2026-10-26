@@ -129,8 +129,10 @@ impl TryFrom<Charm> for rand::Charm {
 #[tsify(missing_as_null)]
 pub struct SkillInfo {
     pub id: SkillId,
-    /// 本家の日本語の略称
+    /// 正式名称 (鑑定画面の表記)
     pub name: &'static str,
+    /// 本家の日本語の略称 (選ぶときに略称でも引けるように)
+    pub abbr: &'static str,
     /// 第 1 スキルとしてのポイントの範囲
     pub pts1: Option<PointRange>,
     /// 第 2 スキルとしてのポイントの範囲 (錬金ではマイナスは出ないので 1 から)
@@ -154,7 +156,8 @@ impl From<&rand::SkillInfo> for SkillInfo {
         };
         Self {
             id: i.skill.id(),
-            name: i.skill.name(),
+            name: i.skill.full_name(),
+            abbr: i.skill.name(),
             pts1: range(&i.pts1),
             pts2: range(&i.pts2),
         }

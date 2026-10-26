@@ -28,7 +28,7 @@ fn impossible_message(
     reasons: &[(rand::Kind, rand::Reason)],
     title: &str,
 ) -> String {
-    let s1 = charm.skill1.name();
+    let s1 = charm.skill1.full_name();
     let lines = reasons.iter().map(|&(kind, reason)| {
         let name = match kind {
             rand::Kind::Weathered => "風化したお守り",
@@ -36,7 +36,7 @@ fn impossible_message(
             rand::Kind::Shining => "光るお守り",
             rand::Kind::Mystery => "なぞのお守り",
         };
-        let (s2, p2) = charm.skill2.map_or(("", 0), |(s, p)| (s.name(), p));
+        let (s2, p2) = charm.skill2.map_or(("", 0), |(s, p)| (s.full_name(), p));
         let why = match reason {
             rand::Reason::Skill1 => format!("{s1}が第1スキルにならない"),
             rand::Reason::Pts1 => format!("第1スキルに{s1}{}が出ない", charm.pts1),

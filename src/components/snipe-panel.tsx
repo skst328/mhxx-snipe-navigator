@@ -388,7 +388,7 @@ function Review({
                   }}
                   // 狙いの行は薄く塗って「狙い」と添え、選んだ行は塗りつぶす
                   className={cn(
-                    'grid w-full grid-cols-[2.5rem_6rem_1fr_auto] items-center gap-2 px-3 py-2 text-left text-sm whitespace-nowrap tabular-nums',
+                    'grid w-full grid-cols-[2.5rem_6rem_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 text-left text-sm whitespace-nowrap tabular-nums',
                     selected
                       ? 'bg-primary text-primary-foreground'
                       : offset === 0
@@ -400,7 +400,8 @@ function Review({
                     {offset === 0 ? '±0' : offset > 0 ? `+${offset}` : offset}
                   </span>
                   <span className={cn('font-mono', !selected && 'text-muted-foreground')}>{showFrame(o.frame)}</span>
-                  <span>{charm ? charmText(skills, charm.charm) : '―'}</span>
+                  {/* 護石の中身は長いと折り返す (スキル名の途中では折らず、空白のところで) */}
+                  <span className="break-keep whitespace-normal">{charm ? charmText(skills, charm.charm) : '―'}</span>
                   <span className={cn('text-xs', !selected && 'text-primary')}>{offset === 0 && '狙い'}</span>
                 </button>
               </li>

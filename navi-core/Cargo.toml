@@ -9,7 +9,7 @@ description = "mhxx-snipe-navigator の wasm の入口 (乱数は mhxx-rand)"
 crate-type = ["cdylib"]
 
 [dependencies]
-mhxx-rand = { git = "https://github.com/skst328/mhxx-rand", tag = "v0.1.0" }
+mhxx-rand = { git = "https://github.com/skst328/mhxx-rand", tag = "v0.2.0" }
 wasm-bindgen = "0.2.128"
 serde = { version = "1.0.229", features = ["derive"] }
 serde-wasm-bindgen = "0.6.5"
