@@ -21,8 +21,6 @@ import { cn } from '@/lib/utils'
 const AROUND = 30
 /** カウントダウンが 0 になってから、0 の表示を残しておく時間 (ミリ秒) */
 const FINISHED_HOLD_MS = 1000
-/** 0 の瞬間を、狙いのフレームの始まりからどれだけ後ろに置くか (F)。真ん中に置き、前後どちらに押しても半フレームの余裕を持たせる */
-const AIM_IN_FRAME = 0.5
 
 /**
  * 狙いのフレームで錬金するまで。
@@ -99,9 +97,9 @@ export function SnipePanel({
   // カウントダウンのスタート: 押した瞬間 (ゲームに戻った瞬間) から、待機時間 (と補正) で数える
   const start = () => {
     if (!waitValid) return
-    // 待機時間 (端数込み) で狙いのフレームの始まりに着くので、その真ん中を 0 にする。
+    // 待機時間 (調合タイマーからセットしたなら、表示で切り捨てた端数も引く) で数える。
     // 待機時間補正はゲーム側のずれ、音ずれ補正は合図の遅れを打ち消す。どちらも 0 の瞬間をずらす
-    const frames = waitSec * FPS + waitFrame - fraction + AIM_IN_FRAME
+    const frames = waitSec * FPS + waitFrame - fraction
     const zeroAt = performance.now() + (frames + settings.waitCorrection + settings.soundCorrection) * FRAME_MS
     stopBeeps.current()
     stopBeeps.current = scheduleBeeps(zeroAt, settings.beepFrom)
