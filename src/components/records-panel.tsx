@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CrownIcon, Trash2Icon } from 'lucide-react'
 
 import { ValueSelect } from '@/components/value-select'
@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { frameToShortTime, showDrift, showFrame } from '@/lib/frame'
 import { charmText } from '@/lib/skills'
-import { drift, gosekiKey, MELDING_LABEL, type Target, type Trial } from '@/lib/snipe'
+import { drift, gosekiKey, melded, MELDING_LABEL, targetKey, type Target, type Trial } from '@/lib/snipe'
 import type { SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-/** 挑戦の記録を、護石ごとに見る: 試行・平均のズレ・最も近いズレ、ズレの推移のグラフ、試行ごとの表 */
+/** 挑戦の記録を、護石ごとに見る: 試行・平均のズレ・最も近いズレ、ズレの推移のグラフ、1 回ごとのカード */
 export function RecordsPanel({
   skills,
   trials,
@@ -50,9 +50,13 @@ export function RecordsPanel({
     return { value: k, label: `${charmText(skills, t.charm)} ${MELDING_LABEL[t.melding]} (${groups.get(k)!.length}回)` }
   })
 
-  const drifts = shown.map(drift)
-  const mean = drifts.reduce((a, b) => a + b, 0) / drifts.length
-  const nearest = drifts.reduce((a, b) => (Math.abs(b) < Math.abs(a) ? b : a))
+  /** この護石で試したエイムポイント */
+  const tried = new Set(shown.map((t) => targetKey(t.target)))
+
+  // ズレは錬金まで行った回だけで見る (連打で狙いを超過した回は、試行の数にだけ入る)
+  const drifts = shown.filter(melded).map(drift)
+  const mean = drifts.length ? drifts.reduce((a, b) => a + b, 0) / drifts.length : null
+  const nearest = drifts.length ? drifts.reduce((a, b) => (Math.abs(b) < Math.abs(a) ? b : a)) : null
 
   return (
     <Card>
@@ -62,60 +66,36 @@ export function RecordsPanel({
           <ValueSelect value={key} onChange={setSelected} options={options} className="w-full" />
         </div>
 
+        {/* この護石のエイムポイントを、狙いのバーと同じ書き方の札で並べる。バーのボタン (枠のある四角) と見分けが
+            付くよう、枠のない丸い札にして薄く色を敷く。試したものは青く、まだ試していないものは灰色にする */}
+        <ul className="flex flex-wrap gap-1.5 text-xs tabular-nums" aria-label="エイムポイント">
+          {shown[0].target.aims.map((a) => (
+            <li
+              key={targetKey(a)}
+              className={cn(
+                'rounded-full px-2.5 py-1 font-medium',
+                tried.has(targetKey(a)) ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
+              )}
+            >
+              {showFrame(a.frame)}F {a.index}番目
+            </li>
+          ))}
+        </ul>
+
         <dl className="grid grid-cols-3 gap-3 text-center">
           <Stat label="試行" value={`${shown.length}回`} />
-          <Stat label="平均のズレ" value={`${mean > 0 ? '+' : ''}${mean.toFixed(1)}F`} />
-          <Stat label="最も近い" value={showDrift(nearest)} />
+          <Stat label="平均のズレ" value={mean === null ? '―' : `${mean > 0 ? '+' : ''}${mean.toFixed(1)}F`} />
+          <Stat label="最も近い" value={nearest === null ? '―' : showDrift(nearest)} />
         </dl>
 
-        <DriftChart drifts={[...drifts].reverse()} />
+        {drifts.length > 0 && <DriftChart drifts={[...drifts].reverse()} />}
 
-        {/* 検索の表と同じく、列は中身の幅に詰めて左から並べ、薄い縦線で区切る。
-            狭い幅では、カードの内側の余白を使って左右いっぱいに広げる (横にはみ出さないように) */}
-        <div className="-mx-(--card-spacing) overflow-x-auto border-y sm:mx-0 sm:rounded-lg sm:border">
-          <table className="w-full text-sm whitespace-nowrap tabular-nums [&_td]:py-2 [&_th]:pt-2 [&_th]:pb-1.5 [&_th]:text-xs [&_th]:font-normal [&_th]:text-muted-foreground">
-            <thead className="border-b">
-              <tr>
-                <th className={cn(CELL, 'text-left')}>#</th>
-                <th className={cn(COLUMN, 'text-right')}>調合時点</th>
-                <th className={cn(COLUMN, 'text-right')}>待機</th>
-                <th className={cn(COLUMN, 'text-left')}>補正</th>
-                <th className={cn(COLUMN, 'text-right')}>ズレ</th>
-                <th className="w-full" />
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {shown.map((t, i) => {
-                const d = drift(t)
-                return (
-                  <tr key={t.at}>
-                    <td className={CELL}>
-                      <span className="inline-flex items-center gap-1">
-                        {shown.length - i}
-                        {d === 0 && <CrownIcon className="size-3.5 text-success" aria-label="的中" />}
-                      </span>
-                    </td>
-                    <td className={cn(COLUMN, 'text-right')}>{t.current === undefined ? '―' : showFrame(t.current)}</td>
-                    <td className={cn(COLUMN, 'text-right')}>
-                      {t.wait === undefined ? '―' : frameToShortTime(t.wait)}
-                    </td>
-                    <td className={COLUMN}>
-                      {/* 2 つの補正は 1 列にまとめて 2 行で出す (列を分けると狭い幅で表がはみ出すので)。値は右でそろえる */}
-                      <dl className="grid grid-cols-[auto_auto] items-baseline gap-x-1">
-                        <dt className="text-xs text-muted-foreground">待機時間:</dt>
-                        <dd className="text-right">{showDrift(t.waitCorrection)}</dd>
-                        <dt className="text-xs text-muted-foreground">音ずれ:</dt>
-                        <dd className="text-right">{showDrift(t.soundCorrection)}</dd>
-                      </dl>
-                    </td>
-                    <td className={cn(COLUMN, 'text-right', d === 0 && 'text-success')}>{showDrift(d)}</td>
-                    <td />
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        {/* 1 回 1 枚のカード (新しい順)。広い幅では 2 列 */}
+        <ol className="grid gap-3 sm:grid-cols-2">
+          {shown.map((t, i) => (
+            <TrialCard key={t.at} trial={t} no={shown.length - i} />
+          ))}
+        </ol>
 
         <Button variant="ghost" size="sm" onClick={onClear}>
           <Trash2Icon />
@@ -126,9 +106,74 @@ export function RecordsPanel({
   )
 }
 
-/** 表の最初の列と、その後ろの列 (中身の幅に詰め、左に薄い線)。狭い幅では余白を詰める */
-const CELL = 'w-px px-2 sm:px-3'
-const COLUMN = `${CELL} border-l border-border/60`
+/**
+ * 1 回分の記録: 1 行目に結果 (錬金まで行った回は実際に錬金したフレームとズレ、連打で狙いを超過した回は「超過」と
+ * 越えたフレーム数)、その下に連打の値、調合を始めたフレーム (調合)、待機時間 (錬金まで行った回だけ)。
+ * エイムポイントは護石ごとにカードの外に出す。記録に無い項目の行は出さない
+ */
+function TrialCard({ trial: t, no }: { trial: Trial; no: number }) {
+  // 錬金まで行った回だけ、実際に錬金したフレームとズレがある
+  const result = melded(t) ? { actual: t.actual, d: drift(t) } : null
+  return (
+    <li className="rounded-lg border text-sm tabular-nums">
+      {/* 1 行目は結果。超過は赤い札、錬金した回はフレームを太く、ズレを札にする。下に区切り線を引いて中身と分ける */}
+      <div className="border-b px-3 py-2">
+        <p className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">#{no}</span>
+          {result === null ? (
+            // 錬金した回と同じ形: 大きく狙いを越えたと分かった位置 (調合スキャンのフレーム + 調合タイマーの経過)、
+            // 札に「超過」とどれだけ越えたか (狙いとの差)
+            <>
+              {t.reached !== undefined && <span className="text-base font-semibold">{showFrame(t.reached)}F</span>}
+              <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-xs font-medium text-destructive">
+                超過{t.reached !== undefined && ` ${showDrift(t.reached - t.target.frame)}`}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-base font-semibold">{showFrame(result.actual)}F</span>
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium',
+                  result.d === 0 ? 'bg-success/15 text-success' : 'bg-muted text-foreground',
+                )}
+              >
+                {result.d === 0 && <CrownIcon className="size-3" aria-label="的中" />}
+                {showDrift(result.d)}
+              </span>
+            </>
+          )}
+        </p>
+      </div>
+      {/* 中身は 2 列に並べて行を減らす。連打の値は補足なので小さく薄く */}
+      <div className="space-y-1.5 px-3 py-2">
+        {t.mash && (
+          <p className="text-xs text-muted-foreground">
+            連打 {t.mash.bpm}BPM × {t.mash.count}回 進行{t.mash.advance}
+            {t.mash.offset !== 0 && ` オフセット${t.mash.offset}`}
+          </p>
+        )}
+        {/* 調合を始めたフレームと待機時間は、錬金まで行った回だけ (超過の回は 1 行目の位置で足りる) */}
+        {result !== null && (
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {t.craftStart !== undefined && <Item label="調合">{showFrame(t.craftStart)}F</Item>}
+            <Item label="待機">{t.wait === undefined ? '―' : frameToShortTime(t.wait)}</Item>
+          </dl>
+        )}
+      </div>
+    </li>
+  )
+}
+
+/** 1 項目: 左に薄く見出し、右に中身 */
+function Item({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  )
+}
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (

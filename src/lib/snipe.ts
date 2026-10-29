@@ -1,4 +1,5 @@
 import type { Pattern } from './pattern'
+import { FPS } from './timing'
 import type { Charm, Kind, Melding } from './types'
 
 /** 錬金のタイミング: 錬金するフレームと、そこで鑑定順の何番目に出るか */
@@ -31,13 +32,22 @@ export interface Trial {
   /** 待機時間補正と音ずれ補正 (F) */
   waitCorrection: number
   soundCorrection: number
-  /** 実際に錬金したフレーム */
-  actual: number
-  /** 調合タイマーで出した現在フレーム (調合タイマーを使っていなければ無い) */
-  current?: number
+  /** 実際に錬金したフレーム。連打で狙いを超過して、錬金しなかった回は無い */
+  actual?: number
+  /** 調合スキャンで分かった、調合を始めたフレーム (入れていなければ無い) */
+  craftStart?: number
+  /** 超過として記録した回の、調合スキャンのフレームに調合タイマーの経過を足したフレーム (狙いを越えたと分かった位置) */
+  reached?: number
   /** カウントダウンに使った待機時間 (F。カウントダウンを使っていなければ無い) */
   wait?: number
+  /** そのときの連打の値と推定着地 */
+  mash?: MashRecord
 }
+
+/** 錬金まで行った回 (実際に錬金したフレームがある) */
+export type MeldedTrial = Trial & { actual: number }
+
+export const melded = (t: Trial): t is MeldedTrial => t.actual !== undefined
 
 /** 目押しの設定 (スナイプと練習で共通。待機時間補正はスナイプだけ) */
 export interface TimingSettings {
@@ -59,6 +69,17 @@ export interface MashSettings {
   offset: number
 }
 
+/** 連打の記録: そのときの連打の値と回数、推定着地 */
+export interface MashRecord extends MashSettings {
+  count: number
+  landing: number
+}
+
+/** 連打し終えたときの乱数の位置 (推定着地): オフセット (起動からコンティニューまで) に、1 回ごとの連打で進む分と、
+ * 1 拍のあいだに時間で進む分 (30F × 60 / BPM) を足したもの */
+export const mashLanding = (s: MashSettings, count: number) =>
+  s.offset + Math.round(count * (s.advance + (FPS * 60) / s.bpm))
+
 /** 補正や連打などの値 (どのタブで変えても同じ値が変わる) */
 export type Settings = TimingSettings & MashSettings
 
@@ -72,7 +93,7 @@ export const DEFAULT_SETTINGS: Settings = {
   offset: 0,
 }
 
-export const drift = (t: Trial) => t.actual - t.target.frame
+export const drift = (t: MeldedTrial) => t.actual - t.target.frame
 
 /** 狙いを見分けるキー (錬金するフレームと鑑定順が同じなら、同じ護石の同じタイミング) */
 export const targetKey = (t: Aim) => `${t.frame}-${t.index}`

@@ -6,39 +6,36 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { frameToShortTime, showFrame } from '@/lib/frame'
 import { beatsDone, runMetronome, type MetronomeRun } from '@/lib/metronome'
-import type { MashSettings, Target } from '@/lib/snipe'
-import { useStored } from '@/lib/storage'
-import { FPS } from '@/lib/timing'
+import { mashLanding, type MashSettings, type Target } from '@/lib/snipe'
 
 /** BPM の上限 */
 const MAX_BPM = 600
 
 /**
- * 乱数を進める連打: メトロノームを鳴らしながら、決めた回数を数える。
- * 連打し終えたときの乱数の位置 (推定着地) と、狙いまでの猶予を出す。
- * 推定着地は、オフセット (起動からコンティニューまで) に、連打で進む分と、連打しているあいだに時間で
- * 進む分 (1 秒 30F) を足したもの
+ * 乱数を進める連打: メトロノームを鳴らしながら、決めた回数 (count) を数える。
+ * 連打し終えたときの乱数の位置 (推定着地) と、狙いまでの猶予を出す
  */
 export function MashPanel({
   target,
   settings,
   onSettings,
+  count,
+  onCount,
 }: {
   target: Target
   settings: MashSettings
   onSettings: (s: Partial<MashSettings>) => void
+  count: number
+  onCount: (count: number) => void
 }) {
-  const [count, setCount] = useStored('mash-count', 100)
   /** 鳴らし終えた (押し終えた) 回数。一時停止したところから続ける */
   const [done, setDone] = useState(0)
   /** 鳴らしている間のメトロノームと、鳴らし始めた回数 */
   const [run, setRun] = useState<{ metronome: MetronomeRun; from: number } | null>(null)
 
   const { bpm, advance, offset } = settings
-  const total = count
-  const finished = done >= total
-  // 推定着地: オフセットに、1 回ごとの連打で進む分と、1 拍のあいだに時間で進む分 (30F × 60 / BPM) を足す
-  const landing = offset + Math.round(total * (advance + (FPS * 60) / bpm))
+  const finished = done >= count
+  const landing = mashLanding(settings, count)
   const margin = target.frame - landing
 
   // 鳴らしている間は、何回目まで鳴ったかを時刻から数え直す
@@ -46,9 +43,9 @@ export function MashPanel({
     if (!run) return
     let frame = 0
     const loop = () => {
-      const n = beatsDone(run.metronome, run.from, total, performance.now())
+      const n = beatsDone(run.metronome, run.from, count, performance.now())
       setDone(n)
-      if (n >= total) {
+      if (n >= count) {
         // 決めた回数に届いた。予約はもう終わっているので止めない (止めると、最後の「ポーン」の伸びが切れる)
         setRun(null)
         return
@@ -57,7 +54,7 @@ export function MashPanel({
     }
     loop()
     return () => cancelAnimationFrame(frame)
-  }, [run, total])
+  }, [run, count])
 
   // 画面を離れたら止める
   const runRef = useRef(run)
@@ -68,7 +65,7 @@ export function MashPanel({
 
   const start = () => {
     if (finished) return
-    setRun({ metronome: runMetronome(bpm, done, total), from: done })
+    setRun({ metronome: runMetronome(bpm, done, count), from: done })
   }
   const pause = () => {
     run?.metronome.stop()
@@ -85,7 +82,7 @@ export function MashPanel({
     setDone(0)
   }
 
-  const progress = total > 0 ? done / total : 0
+  const progress = count > 0 ? done / count : 0
 
   return (
     <Card>
@@ -110,7 +107,7 @@ export function MashPanel({
             value={count}
             min={1}
             onChange={(v) => {
-              setCount(v)
+              onCount(v)
               setDone(0)
             }}
             disabled={!!run}
@@ -154,11 +151,11 @@ export function MashPanel({
         <div className="space-y-3 text-center">
           <p className="text-sm text-muted-foreground">残り</p>
           <p className="font-mono text-6xl font-semibold tabular-nums">
-            {total - done}
+            {count - done}
             <span className="ml-2 text-2xl font-normal text-muted-foreground">回</span>
           </p>
           <p className="text-sm text-muted-foreground tabular-nums">
-            {done} / {total} 回目
+            {done} / {count} 回目
           </p>
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, progress * 100)}%` }} />
