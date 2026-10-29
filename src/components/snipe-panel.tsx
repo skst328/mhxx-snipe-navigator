@@ -449,7 +449,7 @@ function Review({
                   <span className="text-right font-mono">
                     {offset === 0 ? '±0' : offset > 0 ? `+${offset}` : offset}
                   </span>
-                  <span className={cn('font-mono', !selected && 'text-muted-foreground')}>{showFrame(o.frame)}</span>
+                  <span className={cn('font-mono', !selected && 'text-muted-foreground')}>{showFrame(o.frame)}F</span>
                   {/* 護石の中身は長いと折り返す (スキル名の途中では折らず、空白のところで) */}
                   <span className="break-keep whitespace-normal">{charm ? charmText(skills, charm.charm) : '―'}</span>
                   <span className={cn('text-xs', !selected && 'text-primary')}>{offset === 0 && '狙い'}</span>
