@@ -11,7 +11,7 @@ import type { TimingSettings } from '@/lib/snipe'
 export const FIELD_LABEL = 'w-22 shrink-0 text-sm font-normal text-muted-foreground'
 
 /**
- * 目押しの設定: 補正・音・合図のパターン (スナイプと練習と設定で共通)。変えた項目だけを渡す。
+ * 目押しの設定: 補正・音・合図のパターン (スナイプと練習で共通)。変えた項目だけを渡す。
  * 待機時間補正はスナイプだけで使うので、waitCorrection が false なら出さない
  */
 export function TimingSettingsFields({
@@ -20,7 +20,6 @@ export function TimingSettingsFields({
   onChange,
   waitCorrection = true,
   waitCorrectionNote,
-  soundCorrectionAction,
   disabled,
 }: {
   /** 欄の id の頭 (同じ欄が画面に何組かあるので) */
@@ -30,8 +29,6 @@ export function TimingSettingsFields({
   waitCorrection?: boolean
   /** 待機時間補正のすぐ下に出すもの (補正を決める材料) */
   waitCorrectionNote?: ReactNode
-  /** 音ずれ補正の欄の右に置くもの */
-  soundCorrectionAction?: ReactNode
   disabled?: boolean
 }) {
   return (
@@ -52,9 +49,7 @@ export function TimingSettingsFields({
         value={value.soundCorrection}
         onChange={(soundCorrection) => onChange({ soundCorrection })}
         disabled={disabled}
-      >
-        {soundCorrectionAction}
-      </CorrectionField>
+      />
       <div className="flex items-center gap-2">
         <Label htmlFor={`${id}-beep`} className={FIELD_LABEL}>
           合図の音
@@ -95,15 +90,12 @@ function CorrectionField({
   value,
   onChange,
   disabled,
-  children,
 }: {
   id: string
   label: string
   value: number
   onChange: (v: number) => void
   disabled?: boolean
-  /** 欄の右に置くもの */
-  children?: ReactNode
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -138,7 +130,6 @@ function CorrectionField({
         </Button>
       </div>
       <span className="text-sm text-muted-foreground">F</span>
-      {children}
     </div>
   )
 }

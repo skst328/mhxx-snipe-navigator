@@ -6,7 +6,7 @@ import { parseInteger } from '@/lib/timing'
 
 /**
  * 整数の入力欄。打ちかけで読めない値 (範囲の外も) のあいだは、前の値のままにする。
- * ほかの欄 (設定と各タブ) で値が変わったら、表示をその値に合わせる
+ * ほかのタブの同じ欄で値が変わったら、表示をその値に合わせる
  */
 export function IntegerInput({
   value,

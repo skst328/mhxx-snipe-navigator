@@ -11,7 +11,7 @@ import { useStored } from '@/lib/storage'
 import { FPS } from '@/lib/timing'
 
 /** BPM の上限 */
-export const MAX_BPM = 600
+const MAX_BPM = 600
 
 /**
  * 乱数を進める連打: メトロノームを鳴らしながら、決めた回数を数える。

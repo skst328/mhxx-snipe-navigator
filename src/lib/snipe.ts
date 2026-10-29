@@ -59,7 +59,7 @@ export interface MashSettings {
   offset: number
 }
 
-/** 設定: 各タブの初期値 */
+/** 補正や連打などの値 (どのタブで変えても同じ値が変わる) */
 export type Settings = TimingSettings & MashSettings
 
 export const DEFAULT_SETTINGS: Settings = {

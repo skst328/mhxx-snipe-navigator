@@ -26,15 +26,9 @@ interface Press {
 export function PracticePanel({
   settings,
   onSettings,
-  defaultSoundCorrection,
-  onDefaultSoundCorrection,
 }: {
   settings: TimingSettings
   onSettings: (s: Partial<TimingSettings>) => void
-  /** 設定 (初期値) の音ずれ補正 */
-  defaultSoundCorrection: number
-  /** 練習で合わせた音ずれ補正を、設定 (初期値) に書き込む */
-  onDefaultSoundCorrection: (v: number) => void
 }) {
   const [secondsText, setSecondsText] = useState('5')
   const [framesText, setFramesText] = useState('0')
@@ -124,18 +118,6 @@ export function PracticePanel({
               value={settings}
               onChange={onSettings}
               waitCorrection={false}
-              soundCorrectionAction={
-                // 練習で合わせた値が設定と違うときだけ、設定に書き込むボタンを出す
-                settings.soundCorrection !== defaultSoundCorrection && (
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => onDefaultSoundCorrection(settings.soundCorrection)}
-                  >
-                    設定に反映
-                  </Button>
-                )
-              }
               disabled={target !== null}
             />
           </div>
