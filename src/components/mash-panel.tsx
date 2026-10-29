@@ -21,15 +21,18 @@ export function MashPanel({
   onSettings,
   count,
   onCount,
+  done,
+  onDone,
 }: {
   target: Target
   settings: MashSettings
   onSettings: (s: Partial<MashSettings>) => void
   count: number
   onCount: (count: number) => void
-}) {
   /** 鳴らし終えた (押し終えた) 回数。一時停止したところから続ける */
-  const [done, setDone] = useState(0)
+  done: number
+  onDone: (done: number) => void
+}) {
   /** 鳴らしている間のメトロノームと、鳴らし始めた回数 */
   const [run, setRun] = useState<{ metronome: MetronomeRun; from: number } | null>(null)
 
@@ -38,13 +41,21 @@ export function MashPanel({
   const landing = mashLanding(settings, count)
   const margin = target.frame - landing
 
-  // 鳴らしている間は、何回目まで鳴ったかを時刻から数え直す
+  // 鳴らしている間は、何回目まで鳴ったかを時刻から数え直す (呼ぶ側が保存するので、変わったときだけ知らせる)
+  const onDoneRef = useRef(onDone)
+  useEffect(() => {
+    onDoneRef.current = onDone
+  })
   useEffect(() => {
     if (!run) return
     let frame = 0
+    let last = run.from
     const loop = () => {
       const n = beatsDone(run.metronome, run.from, count, performance.now())
-      setDone(n)
+      if (n !== last) {
+        last = n
+        onDoneRef.current(n)
+      }
       if (n >= count) {
         // 決めた回数に届いた。予約はもう終わっているので止めない (止めると、最後の「ポーン」の伸びが切れる)
         setRun(null)
@@ -73,13 +84,13 @@ export function MashPanel({
   }
   const reset = () => {
     pause()
-    setDone(0)
+    onDone(0)
   }
 
   // 数え方が変わったら、数え直す
   const change = (s: Partial<MashSettings>) => {
     onSettings(s)
-    setDone(0)
+    onDone(0)
   }
 
   const progress = count > 0 ? done / count : 0
@@ -108,7 +119,7 @@ export function MashPanel({
             min={1}
             onChange={(v) => {
               onCount(v)
-              setDone(0)
+              onDone(0)
             }}
             disabled={!!run}
           />

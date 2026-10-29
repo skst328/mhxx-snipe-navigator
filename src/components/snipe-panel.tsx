@@ -34,6 +34,46 @@ const AROUND = 30
 const FINISHED_HOLD_MS = 1000
 
 /**
+ * 1 回の挑戦の途中の値。スマホでほかのアプリに切り替えている間にタブが捨てられても戻せるように保存する。
+ * 持つのはいまの護石の分だけで、別の護石に変えたときと「計測を初期化」で消す
+ */
+interface Progress {
+  /** どの護石の挑戦か */
+  goseki: string
+  /** 連打で鳴らし終えた回数 */
+  mashDone: number
+  /** 調合タイマーで測った経過 (F、端数込み。止めるまでは null) */
+  elapsed: number | null
+  scanText: string
+  /** カウントダウンの待機時間 (秒とそれに満たないフレーム) */
+  waitSecText: string
+  waitFrameText: string
+  /** 調合タイマーからセットした待機時間の、表示では切り捨てた端数 (F、0 以上 1 未満)。欄を書き換えたら 0 */
+  fraction: number
+  /** 最後にカウントダウンを始めたときの待機時間・調合を始めたフレーム・連打 (記録に残す) */
+  lastStart: Pick<Trial, 'wait' | 'craftStart' | 'mash'>
+  /** 超過として記録したときの、調合タイマーの経過と調合スキャンのフレーム (同じものを二重に記録しないように) */
+  overshootSaved: string | null
+  /** 答え合わせの、錬金したフレームの欄と、記録に残したか */
+  actualText: string
+  recorded: boolean
+}
+
+const freshProgress = (goseki: string): Progress => ({
+  goseki,
+  mashDone: 0,
+  elapsed: null,
+  scanText: '',
+  waitSecText: '5',
+  waitFrameText: '0',
+  fraction: 0,
+  lastStart: {},
+  overshootSaved: null,
+  actualText: '',
+  recorded: false,
+})
+
+/**
  * 狙いのフレームで錬金するまで。
  * 1. 連打: 乱数を狙いの手前まで進める (ゲームを操作しながら使うので、ほかの手順と同じタブに置く)
  * 2. 調合タイマー: 調合を始めると同時に開始し、ホーム画面に戻ると同時に止める (ホーム画面ではゲーム内の時間が
@@ -61,11 +101,20 @@ export function SnipePanel({
   trials: Trial[]
   onRecord: (t: Trial) => void
 }) {
-  /** 調合タイマーを始めた瞬間 (調合を始めた瞬間。performance.now() の時刻) */
+  const goseki = gosekiKey(target)
+  const [stored, setStored] = useStored<Progress>('snipe-progress', freshProgress(goseki))
+  const progress = stored.goseki === goseki ? stored : freshProgress(goseki)
+  const update = (p: Partial<Progress>) => setStored((prev) => ({ ...prev, ...p }))
+  // 別の護石の値が残っていたら消す (護石を変えると作り直されるので、変えた時点で消える)
+  useEffect(() => {
+    setStored((prev) => (prev.goseki === goseki ? prev : freshProgress(goseki)))
+  }, [goseki, setStored])
+  const { elapsed, scanText, waitSecText, waitFrameText, fraction, lastStart, overshootSaved } = progress
+  /** 「計測を初期化」を押した回数 (連打のカードを作り直して、鳴らしているメトロノームを止めるのに使う) */
+  const [round, setRound] = useState(0)
+
+  /** 調合タイマーを始めた瞬間 (調合を始めた瞬間。performance.now() の時刻)。測っている間だけ持つ */
   const [timerStart, setTimerStart] = useState<number | null>(null)
-  /** 調合タイマーを止めた瞬間 (止めるまでは null) */
-  const [timerStop, setTimerStop] = useState<number | null>(null)
-  const [scanText, setScanText] = useState('')
   /** カウントダウンの 0 の瞬間と、始めたときの狙いのフレーム。止まっている間は null */
   const [running, setRunning] = useState<{ zero: number; frame: number } | null>(null)
   // 同じ護石の別のタイミングに切り替えたら、前のタイミングのカウントダウンは止まっているものとする (調合タイマーは残す)
@@ -75,19 +124,13 @@ export function SnipePanel({
   const scan = parseFrame(scanText)
   // タイマーを止めたら、現在フレームと待機時間が決まる (計測フレームはタイマーの表示と同じく切り捨て。
   // 切り捨てた端数は、カウントダウンにセットしたときに待機時間から引く)
-  const elapsed = timerStart !== null && timerStop !== null ? (timerStop - timerStart) / FRAME_MS : null
   const measured = elapsed !== null ? Math.floor(elapsed) : null
   const current = measured !== null && scan !== null ? scan + measured : null
   const wait = current !== null ? target.frame - current : null
 
-  /** カウントダウンの待機時間 (秒とそれに満たないフレーム) */
-  const [waitSecText, setWaitSecText] = useState('5')
-  const [waitFrameText, setWaitFrameText] = useState('0')
   const waitSec = parseInteger(waitSecText)
   const waitFrame = parseInteger(waitFrameText)
   const waitValid = waitSec !== null && waitSec >= 0 && waitFrame !== null && waitFrame >= 0 && waitFrame < FPS
-  /** 調合タイマーからセットした待機時間の、表示では切り捨てた端数 (F、0 以上 1 未満)。欄を書き換えたら 0 */
-  const [fraction, setFraction] = useState(0)
   /** 連打の回数 (連打のカードで決める。記録にも残す) */
   const [count, setCount] = useStored('mash-count', 100)
   const mash: MashRecord = {
@@ -97,11 +140,7 @@ export function SnipePanel({
     count,
     landing: mashLanding(settings, count),
   }
-  /** 最後にカウントダウンを始めたときの待機時間・調合を始めたフレーム・連打 (記録に残す) */
-  const [lastStart, setLastStart] = useState<Pick<Trial, 'wait' | 'craftStart' | 'mash'>>({})
-  /** 超過として記録したときの、調合タイマーと調合スキャンのフレーム (同じものを二重に記録しないように) */
-  const [overshootSaved, setOvershootSaved] = useState<string | null>(null)
-  const overshootKey = `${timerStart}-${timerStop}-${scan}`
+  const overshootKey = `${elapsed}-${scan}`
 
   const stop = useCallback(() => {
     stopBeeps.current()
@@ -112,9 +151,15 @@ export function SnipePanel({
   const reflect = () => {
     if (wait === null || wait < 0) return
     const w = splitFrames(wait)
-    setWaitSecText(String(w.seconds))
-    setWaitFrameText(String(w.frames))
-    setFraction(elapsed! - measured!)
+    update({ waitSecText: String(w.seconds), waitFrameText: String(w.frames), fraction: elapsed! - measured! })
+  }
+
+  /** 1 回の挑戦の途中の値を全部消す (カウントダウンと連打のメトロノームも止める) */
+  const reset = () => {
+    stop()
+    setTimerStart(null)
+    setStored(freshProgress(goseki))
+    setRound((r) => r + 1)
   }
 
   // カウントダウンのスタート: 押した瞬間 (ゲームに戻った瞬間) から、待機時間 (と補正) で数える
@@ -127,11 +172,7 @@ export function SnipePanel({
     stopBeeps.current()
     stopBeeps.current = scheduleBeeps(zeroAt, settings.beepFrom)
     setRunning({ zero: zeroAt, frame: target.frame })
-    setLastStart({
-      wait: waitSec * FPS + waitFrame,
-      ...(scan !== null && { craftStart: scan }),
-      mash,
-    })
+    update({ lastStart: { wait: waitSec * FPS + waitFrame, ...(scan !== null && { craftStart: scan }), mash } })
   }
 
   // 画面を離れたとき、別のタイミングに切り替えたときは、予約した音を止める
@@ -146,7 +187,21 @@ export function SnipePanel({
 
   return (
     <div className="space-y-6">
-      <MashPanel target={target} settings={settings} onSettings={onSettings} count={count} onCount={setCount} />
+      {/* 次の挑戦に移るときに、途中の値をまとめて消す (補正や連打の値、記録は残す)。挑戦のたびに押すので、幅いっぱいに置く */}
+      <Button variant="secondary" className="h-12 w-full text-base" onClick={reset}>
+        <RotateCcwIcon />
+        計測を初期化
+      </Button>
+      <MashPanel
+        key={round}
+        target={target}
+        settings={settings}
+        onSettings={onSettings}
+        count={count}
+        onCount={setCount}
+        done={progress.mashDone}
+        onDone={(mashDone) => update({ mashDone })}
+      />
       {/* 広い幅では、調合タイマーとカウントダウンを横に並べる */}
       <div className="grid gap-6 md:grid-cols-2 md:items-start">
         <Card>
@@ -154,30 +209,29 @@ export function SnipePanel({
             <CardTitle>2. 調合タイマー</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Elapsed since={timerStart} until={timerStop} />
-            {/* 待機中は「調合開始」、計測中は「停止」(ホーム画面に戻ると同時に押す)、止めたら「やり直す」まで時間を残す */}
+            <Elapsed since={timerStart} stopped={elapsed} />
+            {/* 待機中は「調合開始」、計測中は「停止」(ホーム画面に戻ると同時に押す)、止めたら「リセット」まで時間を残す */}
             <div className="flex gap-2">
-              {timerStart === null ? (
+              {elapsed !== null ? (
+                <Button variant="outline" className="h-12 flex-1" onClick={() => update({ elapsed: null })}>
+                  <RotateCcwIcon />
+                  リセット
+                </Button>
+              ) : timerStart === null ? (
                 <Button className="h-12 flex-1 text-base" onClick={() => setTimerStart(performance.now())}>
                   <TimerIcon />
                   調合開始
                 </Button>
-              ) : timerStop === null ? (
-                <Button className="h-12 flex-1 text-base" onClick={() => setTimerStop(performance.now())}>
-                  <SquareIcon />
-                  停止
-                </Button>
               ) : (
                 <Button
-                  variant="outline"
-                  className="h-12 flex-1"
+                  className="h-12 flex-1 text-base"
                   onClick={() => {
+                    update({ elapsed: (performance.now() - timerStart) / FRAME_MS })
                     setTimerStart(null)
-                    setTimerStop(null)
                   }}
                 >
-                  <RotateCcwIcon />
-                  やり直す
+                  <SquareIcon />
+                  停止
                 </Button>
               )}
             </div>
@@ -191,7 +245,7 @@ export function SnipePanel({
                 className="font-mono"
                 value={scanText}
                 aria-invalid={scanText !== '' && scan === null}
-                onChange={(e) => setScanText(e.target.value)}
+                onChange={(e) => update({ scanText: e.target.value })}
               />
             </div>
             {/* タイマーを止めて、スキャンのフレームを入れたら、現在フレームと待機時間を出す */}
@@ -227,7 +281,7 @@ export function SnipePanel({
                     reached: current,
                     mash,
                   })
-                  setOvershootSaved(overshootKey)
+                  update({ overshootSaved: overshootKey })
                 }}
               >
                 {overshootSaved === overshootKey && <CheckIcon />}
@@ -261,10 +315,7 @@ export function SnipePanel({
                   inputMode="numeric"
                   className="w-16 font-mono"
                   value={waitSecText}
-                  onChange={(e) => {
-                    setWaitSecText(e.target.value)
-                    setFraction(0)
-                  }}
+                  onChange={(e) => update({ waitSecText: e.target.value, fraction: 0 })}
                   disabled={zero !== null}
                 />
                 <span className="text-sm text-muted-foreground">秒</span>
@@ -272,10 +323,7 @@ export function SnipePanel({
                   inputMode="numeric"
                   className="w-16 font-mono"
                   value={waitFrameText}
-                  onChange={(e) => {
-                    setWaitFrameText(e.target.value)
-                    setFraction(0)
-                  }}
+                  onChange={(e) => update({ waitFrameText: e.target.value, fraction: 0 })}
                   disabled={zero !== null}
                   aria-label="待機時間のフレーム"
                 />
@@ -321,13 +369,18 @@ export function SnipePanel({
         corrections={{ waitCorrection: settings.waitCorrection, soundCorrection: settings.soundCorrection }}
         context={lastStart}
         onRecord={onRecord}
+        actualText={progress.actualText}
+        recorded={progress.recorded}
+        onChange={update}
       />
     </div>
   )
 }
 
-/** 調合を始めてからの時間 (始める前は 00:00 00F、止めたら止めた瞬間の時間)。毎フレームの更新は要素を直接書き換える */
-function Elapsed({ since, until }: { since: number | null; until: number | null }) {
+/**
+ * 調合を始めてからの時間 (始める前は 00:00 00F、止めたら測った時間 stopped (F))。毎フレームの更新は要素を直接書き換える
+ */
+function Elapsed({ since, stopped }: { since: number | null; stopped: number | null }) {
   const time = useRef<HTMLSpanElement>(null)
   const frames = useRef<HTMLSpanElement>(null)
   useEffect(() => {
@@ -338,13 +391,13 @@ function Elapsed({ since, until }: { since: number | null; until: number | null 
       if (time.current) time.current.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
       if (frames.current) frames.current.textContent = `${String(shown.frames).padStart(2, '0')}F`
     }
-    if (since === null) {
-      draw(0)
+    // 止めたら、測った時間のまま
+    if (stopped !== null) {
+      draw(stopped * FRAME_MS)
       return
     }
-    // 止めたら、止めた瞬間の時間のまま
-    if (until !== null) {
-      draw(until - since)
+    if (since === null) {
+      draw(0)
       return
     }
     let frame = 0
@@ -354,9 +407,14 @@ function Elapsed({ since, until }: { since: number | null; until: number | null 
     }
     loop()
     return () => cancelAnimationFrame(frame)
-  }, [since, until])
+  }, [since, stopped])
   return (
-    <p className={cn('text-center font-mono tabular-nums', since === null && 'text-muted-foreground')}>
+    <p
+      className={cn(
+        'text-center font-mono tabular-nums',
+        since === null && stopped === null && 'text-muted-foreground',
+      )}
+    >
       <span ref={time} className="text-5xl font-semibold" />
       <span ref={frames} className="ml-2 text-2xl text-muted-foreground" />
     </p>
@@ -370,6 +428,9 @@ function Review({
   corrections,
   context,
   onRecord,
+  actualText,
+  recorded,
+  onChange,
 }: {
   skills: SkillInfo[]
   target: Target
@@ -378,10 +439,12 @@ function Review({
   /** 記録に一緒に残す、カウントダウンを始めたときの待機時間・調合を始めたフレーム・連打 */
   context: Pick<Trial, 'wait' | 'craftStart' | 'mash'>
   onRecord: (t: Trial) => void
+  /** 錬金したフレームの欄と、記録に残したか (呼ぶ側が保存する) */
+  actualText: string
+  recorded: boolean
+  onChange: (p: { actualText?: string; recorded: boolean }) => void
 }) {
   const [outcomes, setOutcomes] = useState<Outcome[] | null>(null)
-  const [actualText, setActualText] = useState('')
-  const [saved, setSaved] = useState(false)
   const list = useRef<HTMLUListElement>(null)
 
   useEffect(() => {
@@ -414,7 +477,7 @@ function Review({
   const record = () => {
     if (actual === null) return
     onRecord({ at: Date.now(), target, ...corrections, actual, ...context })
-    setSaved(true)
+    onChange({ recorded: true })
   }
 
   return (
@@ -432,10 +495,7 @@ function Review({
               <li key={o.frame} data-target={offset === 0 ? '' : undefined}>
                 <button
                   type="button"
-                  onClick={() => {
-                    setActualText(String(o.frame))
-                    setSaved(false)
-                  }}
+                  onClick={() => onChange({ actualText: String(o.frame), recorded: false })}
                   // 狙いの行は薄く塗って「狙い」と添え、選んだ行は塗りつぶす
                   className={cn(
                     'grid w-full grid-cols-[2.5rem_6rem_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 text-left text-sm whitespace-nowrap tabular-nums',
@@ -468,10 +528,7 @@ function Review({
               inputMode="numeric"
               className="w-40 font-mono"
               value={actualText}
-              onChange={(e) => {
-                setActualText(e.target.value)
-                setSaved(false)
-              }}
+              onChange={(e) => onChange({ actualText: e.target.value, recorded: false })}
             />
           </div>
           {drift !== null && (
@@ -481,11 +538,11 @@ function Review({
             </p>
           )}
         </div>
-        <Button onClick={record} disabled={actual === null || saved}>
-          {saved && <CheckIcon />}
-          {saved ? '記録しました' : '記録に残す'}
+        <Button onClick={record} disabled={actual === null || recorded}>
+          {recorded && <CheckIcon />}
+          {recorded ? '記録しました' : '記録に残す'}
         </Button>
-        {saved && drift === 0 && (
+        {recorded && drift === 0 && (
           <p className="flex w-fit items-center gap-1.5 rounded-full border border-success/50 px-3 py-1 text-sm text-success">
             <PartyPopperIcon className="size-4" />
             おめでとう！記録しました
