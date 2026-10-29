@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  AlertCircleIcon,
-  ChartColumnIcon,
-  CrosshairIcon,
-  DumbbellIcon,
-  SearchIcon,
-  XIcon,
-} from 'lucide-react'
+import { AlertCircleIcon, ChartColumnIcon, CrosshairIcon, DumbbellIcon, SearchIcon, XIcon } from 'lucide-react'
 
 import { PracticePanel } from '@/components/practice-panel'
 import { RecordsPanel } from '@/components/records-panel'
@@ -49,8 +42,6 @@ export default function App() {
   const [settings, setSettings] = useStored<Settings>('snipe-settings', DEFAULT_SETTINGS)
   const changeSettings = (s: Partial<Settings>) => setSettings((prev) => ({ ...prev, ...s }))
   const [favorites, setFavorites] = useStored<Goseki[]>('favorite-goseki-by-melding', [])
-  /** 所持済みの護石のキー */
-  const [owned, setOwned] = useStored<string[]>('owned-goseki', [])
   /** 錬金のやり方ごとの、出るスキルとポイントの範囲 (wasm から) */
   const [meldingSkills, setMeldingSkills] = useState<MeldingSkills | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -167,7 +158,6 @@ export default function App() {
                 onTarget={setTarget}
                 favorites={favorites}
                 onFavorites={setFavorites}
-                owned={owned}
                 trials={trials}
               />
             </div>
@@ -196,29 +186,10 @@ export default function App() {
               )}
             </div>
             <div role="tabpanel" hidden={tab !== 'records'}>
-              <RecordsPanel
-                skills={skills}
-                trials={trials}
-                target={target}
-                owned={owned}
-                onOwned={(g) => {
-                  const key = gosekiKey(g)
-                  if (owned.includes(key)) {
-                    setOwned((prev) => prev.filter((k) => k !== key))
-                    return
-                  }
-                  setOwned((prev) => [...prev, key])
-                  // 所持済みにしたら、お気に入りにも入れる (お気に入りの一覧から見えるように)
-                  setFavorites((prev) => (prev.some((f) => gosekiKey(f) === key) ? prev : [g, ...prev]))
-                }}
-                onClear={() => setTrials([])}
-              />
+              <RecordsPanel skills={skills} trials={trials} target={target} onClear={() => setTrials([])} />
             </div>
             <div role="tabpanel" hidden={tab !== 'practice'}>
-              <PracticePanel
-                settings={settings}
-                onSettings={changeSettings}
-              />
+              <PracticePanel settings={settings} onSettings={changeSettings} />
             </div>
           </>
         )}

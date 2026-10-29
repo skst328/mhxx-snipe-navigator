@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { CrownIcon, Trash2Icon } from 'lucide-react'
 
-import { OwnedCrownIcon } from '@/components/owned-crown-icon'
 import { ValueSelect } from '@/components/value-select'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { frameToShortTime, showDrift, showFrame } from '@/lib/frame'
 import { charmText } from '@/lib/skills'
-import { drift, gosekiKey, gosekiOf, MELDING_LABEL, type Goseki, type Target, type Trial } from '@/lib/snipe'
+import { drift, gosekiKey, MELDING_LABEL, type Target, type Trial } from '@/lib/snipe'
 import type { SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -16,8 +15,6 @@ export function RecordsPanel({
   skills,
   trials,
   target,
-  owned,
-  onOwned,
   onClear,
 }: {
   skills: SkillInfo[]
@@ -25,10 +22,6 @@ export function RecordsPanel({
   trials: Trial[]
   /** 今の狙い (記録があれば、最初はその護石を出す) */
   target: Target | null
-  /** 所持済みの護石のキー */
-  owned: string[]
-  /** 護石の所持済みを付ける・外す */
-  onOwned: (g: Goseki) => void
   onClear: () => void
 }) {
   const [selected, setSelected] = useState<string | null>(null)
@@ -57,7 +50,6 @@ export function RecordsPanel({
     return { value: k, label: `${charmText(skills, t.charm)} ${MELDING_LABEL[t.melding]} (${groups.get(k)!.length}回)` }
   })
 
-  const isOwned = owned.includes(key)
   const drifts = shown.map(drift)
   const mean = drifts.reduce((a, b) => a + b, 0) / drifts.length
   const nearest = drifts.reduce((a, b) => (Math.abs(b) < Math.abs(a) ? b : a))
@@ -67,19 +59,7 @@ export function RecordsPanel({
       <CardContent className="space-y-5">
         <div className="space-y-1.5">
           <p className="text-sm text-muted-foreground">表示する護石</p>
-          <div className="flex gap-2">
-            <ValueSelect value={key} onChange={setSelected} options={options} className="min-w-0 flex-1" />
-            {/* 狙っていた護石が出たら付ける (検索とお気に入りの表に王冠が出る)。もう一度押すと外す */}
-            <Button
-              variant={isOwned ? 'default' : 'outline'}
-              className="shrink-0"
-              onClick={() => onOwned(gosekiOf(shown[0].target))}
-              aria-pressed={isOwned}
-            >
-              <OwnedCrownIcon jewel={isOwned} />
-              {isOwned ? '所持済み' : '所持済みにする'}
-            </Button>
-          </div>
+          <ValueSelect value={key} onChange={setSelected} options={options} className="w-full" />
         </div>
 
         <dl className="grid grid-cols-3 gap-3 text-center">

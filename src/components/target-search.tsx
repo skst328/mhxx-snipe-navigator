@@ -64,7 +64,6 @@ export function TargetSearch({
   onTarget,
   favorites,
   onFavorites,
-  owned,
   trials,
 }: {
   /** 錬金のやり方ごとの、出るスキルとポイントの範囲 (条件の選択肢に使う) */
@@ -75,8 +74,6 @@ export function TargetSearch({
   onTarget: (t: Target) => void
   favorites: Goseki[]
   onFavorites: Dispatch<SetStateAction<Goseki[]>>
-  /** 所持済みの護石のキー */
-  owned: string[]
   trials: Trial[]
 }) {
   const [view, setView] = useState<'search' | 'favorites'>('search')
@@ -130,7 +127,6 @@ export function TargetSearch({
           onTarget={onTarget}
           favorites={favorites}
           onFavorite={toggleFavorite}
-          owned={owned}
         />
       </div>
       <div hidden={view !== 'favorites'}>
@@ -156,7 +152,6 @@ export function TargetSearch({
                     favorites={favorites}
                     onTarget={onTarget}
                     onFavorite={toggleFavorite}
-                    owned={owned}
                     extra={{
                       label: '試行',
                       cell: (f) =>
@@ -206,7 +201,6 @@ function SearchView({
   onTarget,
   favorites,
   onFavorite,
-  owned,
 }: {
   meldingSkills: MeldingSkills
   skills: SkillInfo[]
@@ -214,7 +208,6 @@ function SearchView({
   onTarget: (t: Target) => void
   favorites: Goseki[]
   onFavorite: (t: Target) => void
-  owned: string[]
 }) {
   const [melding, setMelding] = useState<Melding>('juju')
   const [compare, setCompare] = useState<Compare>('atLeast')
@@ -563,7 +556,6 @@ function SearchView({
                 favorites={favorites}
                 onTarget={onTarget}
                 onFavorite={onFavorite}
-                owned={owned}
                 // 狭い幅では、カードの内側の余白を使って左右いっぱいに広げる (9 桁のフレームでも横にはみ出さないように)
                 className="-mx-3 rounded-none border-x-0 sm:mx-0 sm:rounded-lg sm:border-x"
               />
