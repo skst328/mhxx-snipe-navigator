@@ -15,6 +15,9 @@ wasm-pack build --target web
 cd ..
 
 pnpm dev
+
+# テスト (src/lib の *.test.ts)
+pnpm test
 ```
 
 ## ライセンス
