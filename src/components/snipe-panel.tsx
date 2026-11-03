@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
 import { CheckIcon, PartyPopperIcon, PlayIcon, RotateCcwIcon, SquareIcon, TimerIcon } from 'lucide-react'
 
 import { Countdown } from '@/components/countdown'
@@ -213,26 +213,26 @@ export function SnipePanel({
             {/* 待機中は「調合開始」、計測中は「停止」(ホーム画面に戻ると同時に押す)、止めたら「リセット」まで時間を残す */}
             <div className="flex gap-2">
               {elapsed !== null ? (
-                <Button variant="outline" className="h-12 flex-1" onClick={() => update({ elapsed: null })}>
+                <PressButton variant="outline" className="h-12 flex-1" onPress={() => update({ elapsed: null })}>
                   <RotateCcwIcon />
                   リセット
-                </Button>
+                </PressButton>
               ) : timerStart === null ? (
-                <Button className="h-12 flex-1 text-base" onClick={() => setTimerStart(performance.now())}>
+                <PressButton className="h-12 flex-1 text-base" onPress={() => setTimerStart(performance.now())}>
                   <TimerIcon />
                   調合開始
-                </Button>
+                </PressButton>
               ) : (
-                <Button
+                <PressButton
                   className="h-12 flex-1 text-base"
-                  onClick={() => {
+                  onPress={() => {
                     update({ elapsed: (performance.now() - timerStart) / FRAME_MS })
                     setTimerStart(null)
                   }}
                 >
                   <SquareIcon />
                   停止
-                </Button>
+                </PressButton>
               )}
             </div>
             <div className="space-y-1.5">
@@ -349,15 +349,15 @@ export function SnipePanel({
             />
             {!waitValid && <p className="text-sm text-destructive">整数で入力 (F は 0〜29)</p>}
             {zero === null ? (
-              <Button className="h-14 w-full text-base" onClick={start} disabled={!waitValid}>
+              <PressButton className="h-14 w-full text-base" onPress={start} disabled={!waitValid}>
                 <PlayIcon />
                 スタート
-              </Button>
+              </PressButton>
             ) : (
-              <Button variant="outline" className="h-14 w-full" onClick={stop}>
+              <PressButton variant="outline" className="h-14 w-full" onPress={stop}>
                 <SquareIcon />
                 止める
-              </Button>
+              </PressButton>
             )}
           </CardContent>
         </Card>
@@ -374,6 +374,25 @@ export function SnipePanel({
         onChange={update}
       />
     </div>
+  )
+}
+
+/**
+ * ゲームのボタンと同時に押すボタン: 指を離した瞬間ではなく、押した瞬間に動かす (押す長さのばらつきが入らない
+ * ように)。押すと別のボタンに替わるので、替わったボタンも押した瞬間だけで動かす (離したときの click が替わった
+ * ボタンに届くため)。キーボードの Enter やスペースは click で受ける (キーボードの click は detail が 0)
+ */
+function PressButton({ onPress, ...props }: ComponentProps<typeof Button> & { onPress: () => void }) {
+  return (
+    <Button
+      {...props}
+      onPointerDown={(e) => {
+        if (e.button === 0) onPress()
+      }}
+      onClick={(e) => {
+        if (e.detail === 0) onPress()
+      }}
+    />
   )
 }
 
