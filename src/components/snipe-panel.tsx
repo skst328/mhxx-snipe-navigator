@@ -24,6 +24,7 @@ import {
 } from '@/lib/snipe'
 import { scheduleBeeps } from '@/lib/sound'
 import { useStored } from '@/lib/storage'
+import { useWakeLock } from '@/lib/wake-lock'
 import { FPS, FRAME_MS, parseInteger, splitFrames } from '@/lib/timing'
 import type { Outcome, SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -120,6 +121,8 @@ export function SnipePanel({
   // 同じ護石の別のタイミングに切り替えたら、前のタイミングのカウントダウンは止まっているものとする (調合タイマーは残す)
   const zero = running !== null && running.frame === target.frame ? running.zero : null
   const stopBeeps = useRef<() => void>(() => {})
+  // 調合タイマーの計測中とカウントダウン中は、画面を触らなくても消えないようにする
+  useWakeLock(timerStart !== null || zero !== null)
 
   const scan = parseFrame(scanText)
   // タイマーを止めたら、現在フレームと待機時間が決まる (計測フレームはタイマーの表示と同じく切り捨て。

@@ -11,6 +11,7 @@ import { PATTERNS, type Pattern } from '@/lib/pattern'
 import type { TimingSettings } from '@/lib/snipe'
 import { scheduleBeeps } from '@/lib/sound'
 import { FPS, FRAME_MS, formatOffset, parseInteger } from '@/lib/timing'
+import { useWakeLock } from '@/lib/wake-lock'
 import { cn } from '@/lib/utils'
 
 /** 記録をパターンごとに何回分まで残すか */
@@ -37,6 +38,8 @@ export function PracticePanel({
   /** 押した記録。新しい順 */
   const [presses, setPresses] = useState<Press[]>([])
   const stopBeeps = useRef<() => void>(() => {})
+  // カウントダウン中は、画面を触らなくても消えないようにする
+  useWakeLock(target !== null)
 
   const seconds = parseInteger(secondsText)
   const frames = parseInteger(framesText)

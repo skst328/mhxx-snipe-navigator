@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { frameToShortTime, showFrame } from '@/lib/frame'
 import { beatsDone, runMetronome, type MetronomeRun } from '@/lib/metronome'
 import { mashLanding, type MashSettings, type Target } from '@/lib/snipe'
+import { useWakeLock } from '@/lib/wake-lock'
 
 /** BPM の上限 */
 const MAX_BPM = 600
@@ -35,6 +36,8 @@ export function MashPanel({
 }) {
   /** 鳴らしている間のメトロノームと、鳴らし始めた回数 */
   const [run, setRun] = useState<{ metronome: MetronomeRun; from: number } | null>(null)
+  // 鳴らしている間は、画面を触らなくても消えないようにする
+  useWakeLock(run !== null)
 
   const { bpm, advance, offset } = settings
   const finished = done >= count
