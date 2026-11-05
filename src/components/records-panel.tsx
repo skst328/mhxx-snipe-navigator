@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CrownIcon, Trash2Icon } from 'lucide-react'
 
-import { ValueSelect } from '@/components/value-select'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { frameToShortTime, showDrift, showFrame } from '@/lib/frame'
 import { charmText } from '@/lib/skills'
 import { drift, gosekiKey, melded, MELDING_LABEL, targetKey, type Target, type Trial } from '@/lib/snipe'
 import type { SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-/** 挑戦の記録を、護石ごとに見る: 試行・平均のズレ・最も近いズレ、ズレの推移のグラフ、1 回ごとのカード */
+/** 挑戦の記録を、護石ごとに見る (エイムポイントで絞り込める): 試行・平均のズレ・最も近いズレ、ズレの推移のグラフ、
+ * 1 回ごとのカード */
 export function RecordsPanel({
   skills,
   trials,
@@ -25,6 +26,8 @@ export function RecordsPanel({
   onClear: () => void
 }) {
   const [selected, setSelected] = useState<string | null>(null)
+  /** 絞り込むエイムポイント (null ならすべて) */
+  const [aim, setAim] = useState<string | null>(null)
   if (trials.length === 0) {
     return (
       <Card>
@@ -44,14 +47,25 @@ export function RecordsPanel({
   const keys = [...groups.keys()]
   const fallback = target && groups.has(gosekiKey(target)) ? gosekiKey(target) : keys[0]
   const key = selected !== null && groups.has(selected) ? selected : fallback
-  const shown = groups.get(key)!
+  const group = groups.get(key)!
+  // 中身が同じでも乱数の位置が違えば別の護石なので、一覧では最後に狙ったフレームも添えて見分ける
+  // (ほかのエイムポイントでも狙っていたら「など」を付ける)
   const options = keys.map((k) => {
-    const t = groups.get(k)![0].target
-    return { value: k, label: `${charmText(skills, t.charm)} ${MELDING_LABEL[t.melding]} (${groups.get(k)!.length}回)` }
+    const g = groups.get(k)!
+    const t = g[0].target
+    const others = new Set(g.map((x) => targetKey(x.target))).size > 1
+    return {
+      value: k,
+      label: `${charmText(skills, t.charm)} ${MELDING_LABEL[t.melding]}`,
+      detail: `${showFrame(t.frame)}F${others ? ' など' : ''} ・ ${g.length}回`,
+    }
   })
 
   /** この護石で試したエイムポイント */
-  const tried = new Set(shown.map((t) => targetKey(t.target)))
+  const tried = new Set(group.map((t) => targetKey(t.target)))
+  // 別の護石に替えて、絞り込んでいたエイムポイントの記録がなければ、すべてを出す
+  const aimKey = aim !== null && tried.has(aim) ? aim : null
+  const shown = aimKey === null ? group : group.filter((t) => targetKey(t.target) === aimKey)
 
   // ズレは錬金まで行った回だけで見る (連打で狙いを超過した回は、試行の数にだけ入る)
   const drifts = shown.filter(melded).map(drift)
@@ -63,24 +77,47 @@ export function RecordsPanel({
       <CardContent className="space-y-5">
         <div className="space-y-1.5">
           <p className="text-sm text-muted-foreground">表示する護石</p>
-          <ValueSelect value={key} onChange={setSelected} options={options} className="w-full" />
+          {/* 閉じている欄には護石の中身だけを出す (どのフレームかは下のエイムポイントで分かる)。開いた一覧は
+              2 行にして、フレームと試行の回数を添える */}
+          <Select
+            items={options}
+            value={key}
+            onValueChange={(v) => {
+              if (v !== null) setSelected(v)
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  <span className="flex flex-col">
+                    <span>{o.label}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{o.detail}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* この護石のエイムポイントを、狙いのバーと同じ書き方の札で並べる。バーのボタン (枠のある四角) と見分けが
-            付くよう、枠のない丸い札にして薄く色を敷く。試したものは青く、まだ試していないものは灰色にする */}
-        <ul className="flex flex-wrap gap-1.5 text-xs tabular-nums" aria-label="エイムポイント">
-          {shown[0].target.aims.map((a) => (
-            <li
+        {/* 押したエイムポイントの記録だけに絞る (「すべて」で戻す)。記録のないエイムポイントは押せない */}
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="エイムポイント">
+          <AimButton checked={aimKey === null} onClick={() => setAim(null)}>
+            すべて
+          </AimButton>
+          {group[0].target.aims.map((a) => (
+            <AimButton
               key={targetKey(a)}
-              className={cn(
-                'rounded-full px-2.5 py-1 font-medium',
-                tried.has(targetKey(a)) ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
-              )}
+              checked={aimKey === targetKey(a)}
+              disabled={!tried.has(targetKey(a))}
+              onClick={() => setAim(targetKey(a))}
             >
               {showFrame(a.frame)}F {a.index}番目
-            </li>
+            </AimButton>
           ))}
-        </ul>
+        </div>
 
         <dl className="grid grid-cols-3 gap-3 text-center">
           <Stat label="試行" value={`${shown.length}回`} />
@@ -92,8 +129,9 @@ export function RecordsPanel({
 
         {/* 1 回 1 枚のカード (新しい順)。広い幅では 2 列 */}
         <ol className="grid gap-3 sm:grid-cols-2">
-          {shown.map((t, i) => (
-            <TrialCard key={t.at} trial={t} no={shown.length - i} />
+          {/* 番号は絞り込んでも変えない (この護石で何回目か) */}
+          {shown.map((t) => (
+            <TrialCard key={t.at} trial={t} no={group.length - group.indexOf(t)} />
           ))}
         </ol>
 
@@ -162,6 +200,33 @@ function TrialCard({ trial: t, no }: { trial: Trial; no: number }) {
         )}
       </div>
     </li>
+  )
+}
+
+/** 絞り込みのボタン 1 つ (狙いのバーのボタンと同じ形。選んでいるものを塗る) */
+function AimButton({
+  checked,
+  disabled,
+  onClick,
+  children,
+}: {
+  checked: boolean
+  disabled?: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <Button
+      size="xs"
+      variant={checked ? 'default' : 'outline'}
+      role="radio"
+      aria-checked={checked}
+      className="tabular-nums"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
   )
 }
 
