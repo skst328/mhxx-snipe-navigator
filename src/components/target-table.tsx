@@ -2,25 +2,25 @@ import { CrosshairIcon, StarIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { frameToShortTime, showFrame } from '@/lib/frame'
-import { skillName } from '@/lib/skills'
+import { skillAbbr } from '@/lib/skills'
 import { gosekiKey, targetKey, type Goseki, type Target } from '@/lib/snipe'
 import type { Charm, SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-/** 護石の中身を、スキルとスロットの列に分けて出す。スキルの列は第 1 スキルと第 2 スキルを 2 行に分ける
- * (正式名称は長いので、横に並べると狭い幅で表がはみ出す。スキル名とポイントは詰める)。
+/** 護石の中身を、スキルとスロットの列に分けて出す。スキルの列は第 1 スキルと第 2 スキルを 2 行に分け、
+ * 略称で出す (狭い幅でもフレームの下に時間を出す幅を空けるため。スキル名とポイントは詰める)。
  * どれも狙いを決める条件なので、同じ強さで出す。span 行ぶん縦に結合する */
 function CharmCells({ skills, charm, span }: { skills: SkillInfo[]; charm: Charm; span: number }) {
   return (
     <>
       <td rowSpan={span} className={FIRST}>
         <div>
-          {skillName(skills, charm.skill1)}
+          {skillAbbr(skills, charm.skill1)}
           {charm.pts1}
         </div>
         {charm.skill2 !== null && (
           <div>
-            {skillName(skills, charm.skill2)}
+            {skillAbbr(skills, charm.skill2)}
             {charm.pts2}
           </div>
         )}
@@ -40,9 +40,10 @@ const COLUMN = 'w-px border-l border-border/60 px-1 sm:px-3'
 const FIRST = 'w-px pr-1 pl-1 sm:pr-3 sm:pl-2'
 
 /**
- * 狙いの候補の表: ☆・スキル (第 1 と第 2 を 2 行で)・スロット (ここまで護石ごと) と、錬金のフレーム・時間 (広い幅だけ)・鑑定順・狙う
- * (タイミングごと)。同じ護石の行 (錬金するフレームと鑑定順だけが違うもの) を隣どうしに並べて渡すと、
- * 護石ごとの列を縦に結合して、護石 1 つにタイミングが何行か並ぶ形にする。
+ * 狙いの候補の表: ☆・スキル (第 1 と第 2 を 2 行で)・スロット (ここまで護石ごと) と、
+ * 錬金のフレーム・時間 (狭い幅ではフレームの下に)・鑑定順・狙う (タイミングごと)。
+ * 同じ護石の行 (錬金するフレームと鑑定順だけが違うもの) を隣どうしに並べて渡すと、護石ごとの列を縦に結合して、
+ * 護石 1 つにタイミングが何行か並ぶ形にする。
  * extra があれば、鑑定順の後ろに列を足す (お気に入りの試行回数など)。
  * ☆ は護石ごと (その護石のタイミング全部が入る)
  */
@@ -129,7 +130,11 @@ export function TargetTable({
                   </>
                 )}
                 {/* 数字の幅は表全体の tabular-nums で揃うので、フォントは変えない (表の中で強調の差を付けるのは時間だけ) */}
-                <td className={cn(COLUMN, tint, 'text-right')}>{showFrame(r.frame)}</td>
+                <td className={cn(COLUMN, tint, 'text-right')}>
+                  {showFrame(r.frame)}
+                  {/* 狭い幅では時間の列を出さないので、フレームの下に小さく出す */}
+                  <div className="text-xs text-muted-foreground sm:hidden">{frameToShortTime(r.frame)}</div>
+                </td>
                 <td className={cn(COLUMN, tint, 'hidden text-right text-muted-foreground sm:table-cell')}>
                   {frameToShortTime(r.frame)}
                 </td>

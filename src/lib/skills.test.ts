@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 
-import { charmText, majorSkills, pointsFor, skillName, skillsFor } from './skills'
+import { charmText, majorSkills, pointsFor, skillAbbr, skillName, skillsFor } from './skills'
 import type { SkillInfo } from './types'
 
 const skills: SkillInfo[] = [
@@ -13,6 +13,11 @@ test('skillName は無いときに「なし」、知らない番号は #番号',
   expect(skillName(skills, 1)).toBe('連撃')
   expect(skillName(skills, null)).toBe('なし')
   expect(skillName(skills, 99)).toBe('#99')
+})
+
+test('skillAbbr は略称、知らない番号は #番号', () => {
+  expect(skillAbbr(skills, 3)).toBe('気紛')
+  expect(skillAbbr(skills, 99)).toBe('#99')
 })
 
 test('skillsFor はその欄に出せるスキルだけ', () => {

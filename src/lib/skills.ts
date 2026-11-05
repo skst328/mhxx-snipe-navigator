@@ -9,6 +9,11 @@ export function skillName(skills: SkillInfo[], id: number | null): string {
   return skills.find((s) => s.id === id)?.name ?? `#${id}`
 }
 
+/** スキルの略称 (表のように幅の狭いところで使う) */
+export function skillAbbr(skills: SkillInfo[], id: number): string {
+  return skills.find((s) => s.id === id)?.abbr ?? `#${id}`
+}
+
 /** その欄に出せるスキル */
 export function skillsFor(skills: SkillInfo[], slot: Slot): SkillInfo[] {
   return skills.filter((s) => s[slot] !== null)
