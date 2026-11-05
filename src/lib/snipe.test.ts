@@ -1,6 +1,17 @@
 import { describe, expect, test } from 'vitest'
 
-import { drift, gosekiKey, gosekiOf, mashLanding, melded, targetKey, targetsOf, type Goseki, type Trial } from './snipe'
+import {
+  drift,
+  gosekiKey,
+  gosekiOf,
+  hit,
+  mashLanding,
+  melded,
+  targetKey,
+  targetsOf,
+  type Goseki,
+  type Trial,
+} from './snipe'
 
 const goseki: Goseki = {
   melding: 'juju',
@@ -42,4 +53,13 @@ test('錬金まで行った回だけ drift を出す (+ が遅い)', () => {
   expect(melded(overshoot)).toBe(false)
   expect(melded(late)).toBe(true)
   expect([late].filter(melded).map(drift)).toEqual([1])
+})
+
+test('同じ護石のほかのエイムポイントで錬金しても当たり (ずれは狙ったフレームから)', () => {
+  // 20004F 2番目を狙って、4F 早い 20000F (1番目に同じ護石が出る) で錬金した
+  const target = targetsOf(goseki)[1]
+  const early = { at: 0, target, waitCorrection: 0, soundCorrection: 0, actual: 20000 }
+  expect(hit(target, early.actual)).toBe(true)
+  expect(drift(early)).toBe(-4)
+  expect(hit(target, 20001)).toBe(false)
 })

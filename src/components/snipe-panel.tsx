@@ -14,6 +14,7 @@ import { charmText } from '@/lib/skills'
 import {
   drift,
   gosekiKey,
+  hit,
   mashLanding,
   melded,
   type MashRecord,
@@ -495,6 +496,9 @@ function Review({
 
   const actual = parseFrame(actualText)
   const drift = actual === null ? null : actual - target.frame
+  /** 狙いの護石が出たか (ほかのエイムポイントのフレームでも当たり。lib の hit と同じ判定。hit を呼ぶと、oxlint が
+   * 下の record の Date.now を描画中の呼び出しと見誤るので、ここでは直接書く) */
+  const won = target.aims.some((a) => a.frame === actual)
 
   const record = () => {
     if (actual === null) return
@@ -556,7 +560,7 @@ function Review({
           {drift !== null && (
             <p className="pb-1 font-mono text-3xl font-semibold tabular-nums">
               <span className="mr-2 text-sm font-normal text-muted-foreground">ずれ</span>
-              <span className={cn(drift === 0 && 'text-success')}>{showDrift(drift)}</span>
+              <span className={cn(won && 'text-success')}>{showDrift(drift)}</span>
             </p>
           )}
         </div>
@@ -564,7 +568,7 @@ function Review({
           {recorded && <CheckIcon />}
           {recorded ? '記録しました' : '記録に残す'}
         </Button>
-        {recorded && drift === 0 && (
+        {recorded && won && (
           <p className="flex w-fit items-center gap-1.5 rounded-full border border-success/50 px-3 py-1 text-sm text-success">
             <PartyPopperIcon className="size-4" />
             おめでとう！記録しました
@@ -593,7 +597,7 @@ function RecentCorrections({ trials }: { trials: MeldedTrial[] }) {
           return (
             <li key={t.at}>
               補正 {showDrift(t.waitCorrection)} → ズレ{' '}
-              <span className={cn(d === 0 ? 'text-success' : 'text-foreground')}>{showDrift(d)}</span>
+              <span className={cn(hit(t.target, t.actual) ? 'text-success' : 'text-foreground')}>{showDrift(d)}</span>
             </li>
           )
         })}

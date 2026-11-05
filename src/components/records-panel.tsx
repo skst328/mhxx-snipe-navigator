@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { frameToShortTime, showDrift, showFrame } from '@/lib/frame'
 import { charmText } from '@/lib/skills'
-import { drift, gosekiKey, melded, MELDING_LABEL, targetKey, type Target, type Trial } from '@/lib/snipe'
+import { drift, gosekiKey, hit, melded, MELDING_LABEL, targetKey, type Target, type Trial } from '@/lib/snipe'
 import type { SkillInfo } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -68,7 +68,8 @@ export function RecordsPanel({
   const shown = aimKey === null ? group : group.filter((t) => targetKey(t.target) === aimKey)
 
   // ズレは錬金まで行った回だけで見る (連打で狙いを超過した回は、試行の数にだけ入る)
-  const drifts = shown.filter(melded).map(drift)
+  const meldedShown = shown.filter(melded)
+  const drifts = meldedShown.map(drift)
   const mean = drifts.length ? drifts.reduce((a, b) => a + b, 0) / drifts.length : null
   const nearest = drifts.length ? drifts.reduce((a, b) => (Math.abs(b) < Math.abs(a) ? b : a)) : null
 
@@ -125,7 +126,9 @@ export function RecordsPanel({
           <Stat label="最も近い" value={nearest === null ? '―' : showDrift(nearest)} />
         </dl>
 
-        {drifts.length > 0 && <DriftChart drifts={[...drifts].reverse()} />}
+        {drifts.length > 0 && (
+          <DriftChart points={meldedShown.map((t) => ({ drift: drift(t), hit: hit(t.target, t.actual) })).reverse()} />
+        )}
 
         {/* 1 回 1 枚のカード (新しい順)。広い幅では 2 列 */}
         <ol className="grid gap-3 sm:grid-cols-2">
@@ -151,7 +154,7 @@ export function RecordsPanel({
  */
 function TrialCard({ trial: t, no }: { trial: Trial; no: number }) {
   // 錬金まで行った回だけ、実際に錬金したフレームとズレがある
-  const result = melded(t) ? { actual: t.actual, d: drift(t) } : null
+  const result = melded(t) ? { actual: t.actual, d: drift(t), hit: hit(t.target, t.actual) } : null
   return (
     <li className="rounded-lg border text-sm tabular-nums">
       {/* 1 行目は結果。超過は赤い札、錬金した回はフレームを太く、ズレを札にする。下に区切り線を引いて中身と分ける */}
@@ -168,15 +171,16 @@ function TrialCard({ trial: t, no }: { trial: Trial; no: number }) {
               </span>
             </>
           ) : (
+            // 狙いの護石が出た回 (ほかのエイムポイントに入った回も) は、ずれが 0 でなくても当たりの札にする
             <>
               <span className="text-base font-semibold">{showFrame(result.actual)}F</span>
               <span
                 className={cn(
                   'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium',
-                  result.d === 0 ? 'bg-success/15 text-success' : 'bg-muted text-foreground',
+                  result.hit ? 'bg-success/15 text-success' : 'bg-muted text-foreground',
                 )}
               >
-                {result.d === 0 && <CrownIcon className="size-3" aria-label="的中" />}
+                {result.hit && <CrownIcon className="size-3" aria-label="的中" />}
                 {showDrift(result.d)}
               </span>
             </>
@@ -271,9 +275,11 @@ function useWidth<T extends HTMLElement>() {
 
 /**
  * ズレの推移 (古い順): 0 の線を真ん中に、遅い (+) は上、早い (−) は下。点の色は遅い・早い・的中で分け、
- * 凡例と値を添える (色だけで見分けさせない)。点に乗せると何回目かとズレが出る
+ * 凡例と値を添える (色だけで見分けさせない)。点に乗せると何回目かとズレが出る。
+ * ほかのエイムポイントに入って当たった回は、ずれの位置のまま的中の色にする
  */
-function DriftChart({ drifts }: { drifts: number[] }) {
+function DriftChart({ points }: { points: { drift: number; hit: boolean }[] }) {
+  const drifts = points.map((p) => p.drift)
   const [box, measured] = useWidth<HTMLDivElement>()
   const W = Math.max(240, measured)
   const range = Math.max(3, ...drifts.map(Math.abs))
@@ -324,16 +330,16 @@ function DriftChart({ drifts }: { drifts: number[] }) {
               strokeWidth={2}
             />
           )}
-          {drifts.map((d, i) => (
+          {points.map(({ drift: d, hit: won }, i) => (
             <g key={i}>
-              <title>{`${i + 1}回目 ${showDrift(d)}`}</title>
+              <title>{`${i + 1}回目 ${showDrift(d)}${won ? ' 的中' : ''}`}</title>
               {/* 当たり判定は点より大きく */}
               <circle cx={x(i)} cy={y(d)} r={14} fill="transparent" />
               <circle
                 cx={x(i)}
                 cy={y(d)}
-                r={d === 0 ? 7 : 5}
-                className={cn('stroke-card', d > 0 ? 'fill-warning' : d < 0 ? 'fill-primary' : 'fill-success')}
+                r={won ? 7 : 5}
+                className={cn('stroke-card', won ? 'fill-success' : d > 0 ? 'fill-warning' : 'fill-primary')}
                 strokeWidth={2}
               />
               {showLabels && (

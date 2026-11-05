@@ -95,6 +95,10 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const drift = (t: MeldedTrial) => t.actual - t.target.frame
 
+/** 狙いの護石が出たか: actual (錬金したフレーム) が、狙ったものに限らず、その護石のどれかのエイムポイントの
+ * フレームなら当たり (ずれは狙ったフレームからのまま数える) */
+export const hit = (goseki: Goseki, actual: number) => goseki.aims.some((a) => a.frame === actual)
+
 /** 狙いを見分けるキー (錬金するフレームと鑑定順が同じなら、同じ護石の同じタイミング) */
 export const targetKey = (t: Aim) => `${t.frame}-${t.index}`
 
