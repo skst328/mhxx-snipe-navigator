@@ -1,6 +1,8 @@
 # mhxx-snipe-navigator
 
-MHXX 護石スナイプの一連の流れを補助するブラウザ向けのツール (作成中)。
+MHXX 護石スナイプの一連の流れを補助するブラウザ向けのツール。
+
+**公開ページ**: <https://skst328.github.io/mhxx-snipe-navigator/>
 
 ## 開発
 
