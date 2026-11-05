@@ -84,7 +84,7 @@ const freshProgress = (goseki: string): Progress => ({
  *    待機時間をカウントダウンにセットできる
  * 3. カウントダウン: ゲームに戻った瞬間にスタートを押し、待機時間から数える (調合タイマーを使わず、待機時間を自分で
  *    入れてもよい)
- * 4. 答え合わせ: 錬金したら、前後のフレームで出る護石から実際のフレームを選んで記録する
+ * 4. 答え合わせ: 錬金したら、前後のフレームで鑑定の 1 番目に出る護石から実際のフレームを選んで記録する
  * 狙いを変えたときは、呼ぶ側が key を変えて作り直す
  */
 export function SnipePanel({
@@ -444,7 +444,11 @@ function Elapsed({ since, stopped }: { since: number | null; stopped: number | n
   )
 }
 
-/** 答え合わせ: 狙いの前後で錬金したときに、狙いと同じ鑑定順に出る護石を並べ、出たものを選ぶ */
+/**
+ * 答え合わせ: 狙いの前後で錬金したときに、鑑定の 1 番目に出る護石を並べ、出たものを選ぶ。狙いの鑑定順に関係なく
+ * 1 番目で見る (1 番目は必ず出て、2 番目以降のように近くのフレームどうしで同じ護石に合流しないので、フレームを
+ * 1 つに絞りやすい)
+ */
 function Review({
   skills,
   target,
@@ -512,38 +516,41 @@ function Review({
         <CardTitle>4. 答え合わせ</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ul ref={list} className="relative max-h-80 divide-y overflow-y-auto rounded-lg border">
-          {outcomes?.map((o) => {
-            const charm = o.charms[target.index - 1]
-            const offset = o.frame - target.frame
-            const selected = actual === o.frame
-            return (
-              <li key={o.frame} data-target={offset === 0 ? '' : undefined}>
-                <button
-                  type="button"
-                  onClick={() => onChange({ actualText: String(o.frame), recorded: false })}
-                  // 狙いの行は薄く塗って「狙い」と添え、選んだ行は塗りつぶす
-                  className={cn(
-                    'grid w-full grid-cols-[2.5rem_6rem_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 text-left text-sm whitespace-nowrap tabular-nums',
-                    selected
-                      ? 'bg-primary text-primary-foreground'
-                      : offset === 0
-                        ? 'bg-primary/15 font-semibold hover:bg-primary/25'
-                        : 'hover:bg-muted/50',
-                  )}
-                >
-                  <span className="text-right font-mono">
-                    {offset === 0 ? '±0' : offset > 0 ? `+${offset}` : offset}
-                  </span>
-                  <span className={cn('font-mono', !selected && 'text-muted-foreground')}>{showFrame(o.frame)}F</span>
-                  {/* 護石の中身は長いと折り返す (スキル名の途中では折らず、空白のところで) */}
-                  <span className="break-keep whitespace-normal">{charm ? charmText(skills, charm.charm) : '―'}</span>
-                  <span className={cn('text-xs', !selected && 'text-primary')}>{offset === 0 && '狙い'}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        <div className="space-y-1.5">
+          <p className="text-sm text-muted-foreground">鑑定の1番目</p>
+          <ul ref={list} className="relative max-h-80 divide-y overflow-y-auto rounded-lg border">
+            {outcomes?.map((o) => {
+              const charm = o.charms[0]
+              const offset = o.frame - target.frame
+              const selected = actual === o.frame
+              return (
+                <li key={o.frame} data-target={offset === 0 ? '' : undefined}>
+                  <button
+                    type="button"
+                    onClick={() => onChange({ actualText: String(o.frame), recorded: false })}
+                    // 狙いの行は薄く塗って「狙い」と添え、選んだ行は塗りつぶす
+                    className={cn(
+                      'grid w-full grid-cols-[2.5rem_6rem_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 text-left text-sm whitespace-nowrap tabular-nums',
+                      selected
+                        ? 'bg-primary text-primary-foreground'
+                        : offset === 0
+                          ? 'bg-primary/15 font-semibold hover:bg-primary/25'
+                          : 'hover:bg-muted/50',
+                    )}
+                  >
+                    <span className="text-right font-mono">
+                      {offset === 0 ? '±0' : offset > 0 ? `+${offset}` : offset}
+                    </span>
+                    <span className={cn('font-mono', !selected && 'text-muted-foreground')}>{showFrame(o.frame)}F</span>
+                    {/* 護石の中身は長いと折り返す (スキル名の途中では折らず、空白のところで) */}
+                    <span className="break-keep whitespace-normal">{charmText(skills, charm.charm)}</span>
+                    <span className={cn('text-xs', !selected && 'text-primary')}>{offset === 0 && '狙い'}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
         <div className="flex flex-wrap items-end gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="actual" className="text-sm font-normal text-muted-foreground">
