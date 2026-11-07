@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckIcon, PartyPopperIcon, PlayIcon, RotateCcwIcon, SquareIcon, TimerIcon } from 'lucide-react'
 
 import { Countdown } from '@/components/countdown'
 import { MashPanel } from '@/components/mash-panel'
+import { PressButton } from '@/components/press-button'
 import { FIELD_LABEL, TimingSettingsFields } from '@/components/timing-settings'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -378,25 +379,6 @@ export function SnipePanel({
         onChange={update}
       />
     </div>
-  )
-}
-
-/**
- * ゲームのボタンと同時に押すボタン: 指を離した瞬間ではなく、押した瞬間に動かす (押す長さのばらつきが入らない
- * ように)。押すと別のボタンに替わるので、替わったボタンも押した瞬間だけで動かす (離したときの click が替わった
- * ボタンに届くため)。キーボードの Enter やスペースは click で受ける (キーボードの click は detail が 0)
- */
-function PressButton({ onPress, ...props }: ComponentProps<typeof Button> & { onPress: () => void }) {
-  return (
-    <Button
-      {...props}
-      onPointerDown={(e) => {
-        if (e.button === 0) onPress()
-      }}
-      onClick={(e) => {
-        if (e.detail === 0) onPress()
-      }}
-    />
   )
 }
 

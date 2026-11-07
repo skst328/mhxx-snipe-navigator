@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { PlayIcon, SquareIcon, Trash2Icon } from 'lucide-react'
+import { PlayIcon, Trash2Icon } from 'lucide-react'
 
 import { Countdown } from '@/components/countdown'
+import { PressButton } from '@/components/press-button'
 import { FIELD_LABEL, TimingSettingsFields } from '@/components/timing-settings'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,6 +17,8 @@ import { cn } from '@/lib/utils'
 
 /** 記録をパターンごとに何回分まで残すか */
 const HISTORY = 20
+/** 0 を過ぎてから押さずにこれだけたったら、押し忘れとして記録せずに終える (ミリ秒) */
+const MISS_AFTER_MS = 1000
 
 /** 押したときのずれ (フレーム、+ が遅い) と、そのときの合図のパターン */
 interface Press {
@@ -52,6 +55,13 @@ export function PracticePanel({
   }, [])
 
   useEffect(() => () => stopBeeps.current(), [])
+
+  // 0 を過ぎても押さなかったら、少しして記録せずに終える (押し忘れ。やめるボタンの代わり)
+  useEffect(() => {
+    if (target === null) return
+    const timer = setTimeout(stop, Math.max(0, target - performance.now()) + MISS_AFTER_MS)
+    return () => clearTimeout(timer)
+  }, [target, stop])
 
   const start = () => {
     if (!valid) return
@@ -127,24 +137,18 @@ export function PracticePanel({
 
           <Countdown target={target} idleFrames={waitFrames} pattern={settings.pattern} />
 
-          <div className="flex gap-2">
-            {target === null ? (
-              <Button className="h-14 flex-1 text-base" onClick={start} disabled={!valid}>
-                <PlayIcon />
-                スタート
-              </Button>
-            ) : (
-              <>
-                <Button className="h-14 flex-3 text-lg" onPointerDown={press}>
-                  押す
-                </Button>
-                <Button variant="outline" className="h-14 flex-1" onClick={stop}>
-                  <SquareIcon />
-                  やめる
-                </Button>
-              </>
-            )}
-          </div>
+          {/* スタートと押すは同じ場所に置き、押した瞬間に動かす (離したときに替わったボタンが反応しないように)。
+              やめるボタンは置かない (押し間違えるので。押さなければ 0 を過ぎて少しで終わる) */}
+          {target === null ? (
+            <PressButton className="h-14 w-full text-base" onPress={start} disabled={!valid}>
+              <PlayIcon />
+              スタート
+            </PressButton>
+          ) : (
+            <PressButton className="h-14 w-full text-lg" onPress={press}>
+              押す
+            </PressButton>
+          )}
           {!valid && <p className="text-sm text-destructive">整数で入力 (F は 0〜29)</p>}
         </CardContent>
       </Card>
