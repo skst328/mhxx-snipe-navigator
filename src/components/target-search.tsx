@@ -77,8 +77,9 @@ export function TargetSearch({
   trials: Trial[]
 }) {
   const [view, setView] = useState<'search' | 'favorites'>('search')
-  /** 外すか確かめている、お気に入りの護石 */
+  /** 外すか確かめている、お気に入りの護石。確かめの窓を閉じても残す (閉じて消えていく間も、同じ文を出しておくため) */
   const [removing, setRemoving] = useState<Goseki | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
   // ☆ を押したら、その護石 (どのタイミングの行でも) を入れる (新しく入れたものは先頭に)。
   // 入っていれば、押し間違えで消えないよう、外す前に確かめる
@@ -86,6 +87,7 @@ export function TargetSearch({
     const key = gosekiKey(t)
     if (favorites.some((f) => gosekiKey(f) === key)) {
       setRemoving(gosekiOf(t))
+      setConfirming(true)
       return
     }
     // 続けて押しても取りこぼさないよう、直前の値から作る
@@ -168,7 +170,7 @@ export function TargetSearch({
           </div>
         )}
       </div>
-      <AlertDialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>お気に入りから外しますか？</AlertDialogTitle>
@@ -181,7 +183,7 @@ export function TargetSearch({
             <AlertDialogAction
               onClick={() => {
                 if (removing) remove(removing)
-                setRemoving(null)
+                setConfirming(false)
               }}
             >
               外す
