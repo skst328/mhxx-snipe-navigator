@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CrownIcon, Trash2Icon } from 'lucide-react'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -16,18 +26,27 @@ export function RecordsPanel({
   skills,
   trials,
   target,
-  onClear,
+  onDelete,
 }: {
   skills: SkillInfo[]
   /** 新しい順 */
   trials: Trial[]
   /** 今の狙い (記録があれば、最初はその護石を出す) */
   target: Target | null
-  onClear: () => void
+  /** 記録を消す (消すものを記録した時刻で渡す) */
+  onDelete: (ats: number[]) => void
 }) {
   const [selected, setSelected] = useState<string | null>(null)
   /** 絞り込むエイムポイント (null ならすべて) */
   const [aim, setAim] = useState<string | null>(null)
+  /** 消すか確かめている記録 (記録した時刻) と、確かめの文。開いたときに決め、閉じても残す
+   * (消したあとに表示が変わっても、閉じて消えていく間は同じ文を出しておくため) */
+  const [deleting, setDeleting] = useState<{ ats: number[]; title: string; detail: string } | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const confirmDelete = (d: { ats: number[]; title: string; detail: string }) => {
+    setDeleting(d)
+    setConfirming(true)
+  }
   if (trials.length === 0) {
     return (
       <Card>
@@ -133,16 +152,58 @@ export function RecordsPanel({
         {/* 1 回 1 枚のカード (新しい順)。広い幅では 2 列 */}
         <ol className="grid gap-3 sm:grid-cols-2">
           {/* 番号は絞り込んでも変えない (この護石で何回目か) */}
-          {shown.map((t) => (
-            <TrialCard key={t.at} trial={t} no={group.length - group.indexOf(t)} />
-          ))}
+          {shown.map((t) => {
+            const no = group.length - group.indexOf(t)
+            return (
+              <TrialCard
+                key={t.at}
+                trial={t}
+                no={no}
+                onDelete={() =>
+                  confirmDelete({ ats: [t.at], title: `#${no} の記録を消しますか？`, detail: '1 回分を消します。' })
+                }
+              />
+            )
+          })}
         </ol>
 
-        <Button variant="ghost" size="sm" onClick={onClear}>
+        {/* まとめて消すのは、表示している護石の記録だけ (ほかの護石の記録は巻き込まない) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() =>
+            confirmDelete({
+              ats: group.map((t) => t.at),
+              title: 'この護石の記録を消しますか？',
+              detail: `${options.find((o) => o.value === key)!.label} の ${group.length} 回分を消します。`,
+            })
+          }
+        >
           <Trash2Icon />
-          記録を全部消す
+          この護石の記録を消す
         </Button>
       </CardContent>
+      {/* 消す前に必ず確かめる (元に戻せないので) */}
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{deleting?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{deleting?.detail}元に戻せません。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>やめる</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (deleting !== null) onDelete(deleting.ats)
+                setConfirming(false)
+              }}
+            >
+              消す
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
@@ -150,9 +211,9 @@ export function RecordsPanel({
 /**
  * 1 回分の記録: 1 行目に結果 (錬金まで行った回は実際に錬金したフレームとズレ、連打で狙いを超過した回は「超過」と
  * 越えたフレーム数)、その下に連打の値、調合を始めたフレーム (調合)、待機時間 (錬金まで行った回だけ)。
- * エイムポイントは護石ごとにカードの外に出す。記録に無い項目の行は出さない
+ * エイムポイントは護石ごとにカードの外に出す。記録に無い項目の行は出さない。1 行目の右端に、この回を消すボタン
  */
-function TrialCard({ trial: t, no }: { trial: Trial; no: number }) {
+function TrialCard({ trial: t, no, onDelete }: { trial: Trial; no: number; onDelete: () => void }) {
   // 錬金まで行った回だけ、実際に錬金したフレームとズレがある
   const result = melded(t) ? { actual: t.actual, d: drift(t), hit: hit(t.target, t.actual) } : null
   return (
@@ -185,6 +246,16 @@ function TrialCard({ trial: t, no }: { trial: Trial; no: number }) {
               </span>
             </>
           )}
+          {/* 目立たないよう薄く小さく。行の高さを変えないよう、上下の余白は打ち消す */}
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="-my-1 ml-auto text-muted-foreground"
+            onClick={onDelete}
+            aria-label={`#${no} の記録を消す`}
+          >
+            <Trash2Icon />
+          </Button>
         </p>
       </div>
       {/* 中身は 2 列に並べて行を減らす。連打の値は補足なので小さく薄く */}

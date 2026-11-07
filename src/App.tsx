@@ -186,7 +186,12 @@ export default function App() {
               )}
             </div>
             <div role="tabpanel" hidden={tab !== 'records'}>
-              <RecordsPanel skills={skills} trials={trials} target={target} onClear={() => setTrials([])} />
+              <RecordsPanel
+                skills={skills}
+                trials={trials}
+                target={target}
+                onDelete={(ats) => setTrials((prev) => prev.filter((t) => !ats.includes(t.at)))}
+              />
             </div>
             <div role="tabpanel" hidden={tab !== 'practice'}>
               <PracticePanel settings={settings} onSettings={changeSettings} />
