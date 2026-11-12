@@ -114,7 +114,7 @@ function CorrectionField({
         </Button>
         <IntegerInput
           id={id}
-          className="w-12 text-center font-mono"
+          className="w-16 text-center font-mono"
           value={value}
           onChange={onChange}
           disabled={disabled}
