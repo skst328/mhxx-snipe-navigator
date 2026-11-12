@@ -4,7 +4,7 @@ import { PauseIcon, PlayIcon, RotateCcwIcon } from 'lucide-react'
 import { IntegerField } from '@/components/integer-input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { frameToShortTime, showFrame } from '@/lib/frame'
+import { frameToShortTime, secondsToShortTime, showFrame } from '@/lib/frame'
 import { beatsDone, runMetronome, type MetronomeRun } from '@/lib/metronome'
 import { mashLanding, type MashSettings, type Target } from '@/lib/snipe'
 import { useWakeLock } from '@/lib/wake-lock'
@@ -170,6 +170,8 @@ export function MashPanel({
           </p>
           <p className="text-sm text-muted-foreground tabular-nums">
             {done} / {count} 回目
+            {/* 始める前は連打にかかる時間、連打の最中はあとどれくらいか */}
+            <span className="block">残り {secondsToShortTime(((count - done) * 60) / bpm)}</span>
           </p>
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, progress * 100)}%` }} />

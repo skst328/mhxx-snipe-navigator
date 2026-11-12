@@ -3,8 +3,19 @@ import { FPS } from './timing'
 /** フレームを短い時間の表記にする (「5d 19h 31m 50s 20f」。本家の watch と同じ並びで、0 の上の単位は省く)。
  * 先頭より後ろの単位は 2 桁にそろえる (「20m 00s 08f」。右寄せで並べると単位の位置がそろう) */
 export function frameToShortTime(frame: number): string {
-  const f = frame % FPS
   const s = Math.floor(frame / FPS)
+  return joinUnits([...leadingUnits(s), [frame % FPS, 'f']])
+}
+
+/** 秒を短い時間の表記にする (「1m 40s」。frameToShortTime と同じ書き方で、フレームは付けない。秒は四捨五入) */
+export function secondsToShortTime(seconds: number): string {
+  const s = Math.round(seconds)
+  const units = leadingUnits(s)
+  return joinUnits(units.length > 0 ? units : [[0, 's']])
+}
+
+/** 秒を日・時・分・秒に分け、0 の上の単位は省く (すべて 0 なら空) */
+function leadingUnits(s: number): [number, string][] {
   const parts: [number, string][] = [
     [Math.floor(s / 86400), 'd'],
     [Math.floor(s / 3600) % 24, 'h'],
@@ -12,8 +23,12 @@ export function frameToShortTime(frame: number): string {
     [s % 60, 's'],
   ]
   const first = parts.findIndex(([v]) => v > 0)
-  const shown: [number, string][] = [...(first < 0 ? [] : parts.slice(first)), [f, 'f']]
-  return shown.map(([v, u], i) => `${i === 0 ? v : String(v).padStart(2, '0')}${u}`).join(' ')
+  return first < 0 ? [] : parts.slice(first)
+}
+
+/** 単位ごとの値をつなぐ。先頭より後ろは 2 桁にそろえる */
+function joinUnits(units: [number, string][]): string {
+  return units.map(([v, u], i) => `${i === 0 ? v : String(v).padStart(2, '0')}${u}`).join(' ')
 }
 
 /** フレームをゲーム開始からの時間としてざっくり表す */

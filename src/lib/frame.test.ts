@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { approximateTime, frameToShortTime, parseFrame, showDrift } from './frame'
+import { approximateTime, frameToShortTime, parseFrame, secondsToShortTime, showDrift } from './frame'
 import { FPS } from './timing'
 
 describe('frameToShortTime', () => {
@@ -18,6 +18,15 @@ describe('frameToShortTime', () => {
     const seconds = 5 * 86400 + 19 * 3600 + 31 * 60 + 50
     expect(frameToShortTime(seconds * FPS + 20)).toBe('5d 19h 31m 50s 20f')
   })
+})
+
+test('secondsToShortTime はフレームなしで、0 の上の単位を省く', () => {
+  expect(secondsToShortTime(0)).toBe('0s')
+  expect(secondsToShortTime(40)).toBe('40s')
+  expect(secondsToShortTime(100)).toBe('1m 40s')
+  expect(secondsToShortTime(3605)).toBe('1h 00m 05s')
+  // 秒は四捨五入
+  expect(secondsToShortTime(85.7)).toBe('1m 26s')
 })
 
 test('approximateTime はいちばん大きい単位で丸める', () => {
