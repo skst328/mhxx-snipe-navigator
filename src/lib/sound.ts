@@ -1,10 +1,29 @@
 let context: AudioContext | null = null
 
-/** 音を鳴らす AudioContext (1 つを使い回す)。ブラウザは操作の中でしか音を出させないので、ボタンを押したときに呼ぶ */
+/**
+ * 音を鳴らす AudioContext (1 つを使い回す。OS に閉じられていたら作り直す)。
+ * ブラウザは操作の中でしか音を出させないので、ボタンを押したときに呼ぶ
+ */
 export function audio(): AudioContext {
-  context ??= new AudioContext()
+  if (context === null) wakeOnInteraction()
+  if (context === null || context.state === 'closed') context = new AudioContext()
   void context.resume()
   return context
+}
+
+/**
+ * 別のアプリに切り替えたり画面を消したりすると、OS が AudioContext を止めることがある。止まったものを起こせるのは
+ * 操作の瞬間だけで、タッチでは指を置いた瞬間 (PressButton が動く pointerdown) は数えられず、離した瞬間だけが
+ * 数えられる。なので、どこかを触って離したとき・キーを押したときに、止まっていれば起こし直す。
+ * 初めて音を鳴らすときに 1 回だけ仕掛ける (音を使わない人の端末では何もしない)
+ */
+function wakeOnInteraction() {
+  const wake = () => {
+    if (context !== null && context.state !== 'running' && context.state !== 'closed') void context.resume()
+  }
+  for (const type of ['pointerup', 'keydown']) {
+    window.addEventListener(type, wake, { capture: true, passive: true })
+  }
 }
 
 /** at (AudioContext の時刻) に、音を 1 つ予約する (duration 秒かけて消える)。止めるための OscillatorNode を返す */
